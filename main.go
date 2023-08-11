@@ -82,7 +82,7 @@ func initUser(db *gorm.DB) *web.UserHandler {
 }
 
 func initDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open("root:r4t7u#8i9s@tcp(120.132.118.90:3306)/webook?charset=utf8&timeout=4s"))
+	db, err := gorm.Open(mysql.Open("root:xxxxxx(x.x.x.x:3306)/webook?charset=utf8&timeout=4s"))
 	if err != nil {
 		// 我只会在初始化过程中 panic
 		// panic 相当于整个 goroutine 结束
