@@ -1,8 +1,9 @@
-# webook
 
-# 注册
-![img.png](img.png)
-```Bash
+
+#注册一个用户
+curl -s -XPOST -H'Content-Type: application/json' -d '{"email":"asxxxxxxxxxx@163.com","confirmPassword":"xxxx@1xxxxxxxxx","password":"xxxx@1xxxxxxxxx"}' http://127.0.0.1:8090/users/signup
+
+#查询数据库
 mysql> select * from webook.users;
 +----+----------------------+--------------------------------------------------------------+---------------+---------------+-----------+-----------+----------+
 | id | email                | password                                                     | ctime         | utime         | nick_name | birth_day | describe |
@@ -10,21 +11,16 @@ mysql> select * from webook.users;
 |  2 | asxxxxxxxxxx@164.com | $2a$10$kCmkTGVNnH/wJeJP1l0T8eZba5JJNr2QE.hxlPnSLu8i3rBAnY6uK | 1691734608691 | 1691734608691 |           |           |          |
 +----+----------------------+--------------------------------------------------------------+---------------+---------------+-----------+-----------+----------+
 
-```
 
-# 登录
-![img_1.png](img_1.png)
+#登录
+curl -s -XPOST -H'Content-Type: application/json' -d '{"email":"asxxxxxxxxxx@163.com","password":"xxxx@1xxxxxxxxx"}' http://127.0.0.1:8090/users/login
 
-# 修改个人信息
-![img_2.png](img_2.png)
-```Bash
+#修改信息
+
+
 mysql> select * from webook.users;
 +----+----------------------+--------------------------------------------------------------+---------------+---------------+-----------+------------+----------+
 | id | email                | password                                                     | ctime         | utime         | nick_name | birth_day  | describe |
 +----+----------------------+--------------------------------------------------------------+---------------+---------------+-----------+------------+----------+
 |  2 | asxxxxxxxxxx@164.com | $2a$10$kCmkTGVNnH/wJeJP1l0T8eZba5JJNr2QE.hxlPnSLu8i3rBAnY6uK | 1691734608691 | 1691734762641 | xcd       | 1992-01-01 | ccccc2   |
 +----+----------------------+--------------------------------------------------------------+---------------+---------------+-----------+------------+----------+
-```
-
-# 获取个人信息
-![img_3.png](img_3.png)
