@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webook-service # rs名称
+  namespace: webook
+spec:
+  replicas: 2
+  selector: # 选择器，通过它指定该控制器管理哪些pod
+    matchLabels:
+      app: webook-pod
+  template: ## 模板，当副本数量不足时，会根据下面的模板创建pod副本
+    metadata:
+      labels: #pod 的标签
+        app: webook-pod
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: http-pod
+          image: ljy2022/webook:0.2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8089

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: webook-pod
+  namespace: webook
+
+spec:
+  containers:
+  - name: webook
+    image: ljy2022/webook:0.1
+    imagePullPolicy: IfNotPresent
+    ports:
+    - name: http-server
+      containerPort: 8089
+      protocol: TCP
+  nodeName: master

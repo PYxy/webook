@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webook-redis # rs名称
+  namespace: webook
+spec:
+  replicas: 1
+  selector: # 选择器，通过它指定该控制器管理哪些pod
+    matchLabels:
+      app: webook-redis
+  template: ## 模板，当副本数量不足时，会根据下面的模板创建pod副本
+    metadata:
+      labels: #pod 的标签
+        app: webook-redis
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: redis-pod
+          image: redis:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6379
+
+

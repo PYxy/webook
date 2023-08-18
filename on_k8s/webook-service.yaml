@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: webook
+  name: webook-pod-service
+spec:
+  selector:
+    app: webook-pod
+  ports:
+    - protocol: TCP
+      #
+      port: 8081
+      targetPort: 8090
+      #nodePort: 30004
+  

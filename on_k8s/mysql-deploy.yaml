@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webook-mysql # rs名称
+  namespace: webook
+spec:
+  replicas: 1
+  selector: # 选择器，通过它指定该控制器管理哪些pod
+    matchLabels:
+      app: webook-mysql
+  template: ## 模板，当副本数量不足时，会根据下面的模板创建pod副本
+    metadata:
+      labels: #pod 的标签
+        app: webook-mysql
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: mysql-pod
+          image: mysql:8.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: root
+          volumeMounts:
+            #            - 这边要对应到 mysql 的数据存储的位置
+            #            - 通过 MySQL 的配置可以改这个目录
+            - mountPath: /var/lib/mysql
+              #              我 POD 里面有那么多 volumes，我要用哪个
+              name: mysql-storage
+          ports:
+            - containerPort: 3306
+      #      我整个 POD 有哪些
+      volumes:
+        - name: mysql-storage
+          persistentVolumeClaim:
+            claimName: mysql-pvc
+      #        - name: hadoop-storage
+      #          persistentVolumeClaim:
+      #            claimName: webook-hadoop-live-claim
+
+

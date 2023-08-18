@@ -1,7 +1,7 @@
 
 
 #注册一个用户
-curl -s -XPOST -H'Content-Type: application/json' -d '{"email":"asxxxxxxxxxx@163.com","confirmPassword":"xxxx@1xxxxxxxxx","password":"xxxx@1xxxxxxxxx"}' http://127.0.0.1:8090/users/signup
+curl -s -XPOST -H'Content-Type: application/json' -d '{"email":"asxxxxxxxxxx@163.com","confirmPassword":"xxxx@1xxxxxxxxx","password":"xxxx@1xxxxxxxxx"}' http://10.244.219.91:8090/users/signup
 
 #查询数据库
 mysql> select * from webook.users;

@@ -8,7 +8,9 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	jwt "github.com/golang-jwt/jwt/v5"
 	"net/http"
+	"time"
 )
 
 // UserHandler 我准备在它上面定义跟用户有关的路由
@@ -38,14 +40,17 @@ func (u *UserHandler) RegisterRoutesV1(ug *gin.RouterGroup) {
 	ug.GET("/profile", u.Profile)
 	ug.POST("/signup", u.SignUp)
 	ug.POST("/login", u.Login)
+
 	ug.POST("/edit", u.Edit)
 }
 
 func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
 	ug.GET("/profile", u.Profile)
+	ug.GET("/profileJWT", u.ProfileJWT)
 	ug.POST("/signup", u.SignUp)
 	ug.POST("/login", u.Login)
+	ug.POST("/loginJWT", u.LoginJWT)
 	ug.POST("/edit", u.Edit)
 }
 
@@ -128,12 +133,62 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 	// 在这里登录成功了
 	// 设置 session
 	sess := sessions.Default(ctx)
+
 	// 我可以随便设置值了
 	// 你要放在 session 里面的值
 	sess.Set("userId", user.Id)
 	sess.Save()
 	ctx.String(http.StatusOK, "登录成功")
 	return
+}
+
+func (u *UserHandler) LoginJWT(ctx *gin.Context) {
+	type LoginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	var req LoginReq
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	user, err := u.svc.Login(ctx, req.Email, req.Password)
+	if err == service.ErrInvalidUserOrPassword {
+		ctx.String(http.StatusOK, "用户名或密码不对")
+		return
+	}
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
+	// 步骤2
+	// 在这里登录成功了
+	// 设置JWT  token
+	claims := UserClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+		},
+		Uid:       user.Id,
+		UserAgent: ctx.Request.UserAgent(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	tokenStr, err := token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
+	if err != nil {
+		ctx.String(http.StatusInternalServerError, "系统错误")
+		return
+	}
+	ctx.Header("x-jwt-token", tokenStr)
+	ctx.String(http.StatusOK, "登录成功")
+}
+
+func (u *UserHandler) LogOut(ctx *gin.Context) {
+	sess := sessions.Default(ctx)
+	sess.Options(sessions.Options{
+		MaxAge: -1,
+	})
+	_ = sess.Save()
+	ctx.String(http.StatusOK, "退出成功")
 }
 
 func (u *UserHandler) Edit(ctx *gin.Context) {
@@ -204,4 +259,47 @@ func (u *UserHandler) Profile(ctx *gin.Context) {
 	})
 
 	return
+}
+
+func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
+	type EditReq struct {
+		Email    string `json:"email"`
+		NickName string `json:"nick_name"`
+		BirthDay string `json:"birthDay"`
+		Describe string `json:"describe"`
+	}
+	val, _ := ctx.Get("claims")
+	claims, _ := val.(*UserClaims)
+	user, err := u.svc.Select(ctx, claims.Uid)
+
+	if err != nil {
+		fmt.Println("数据获取失败:", err)
+		ctx.JSON(http.StatusBadRequest, map[string]interface{}{
+			"code":     "0",
+			"errmsg":   err.Error(),
+			"userinfo": EditReq{},
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, map[string]interface{}{
+		"code":   "1",
+		"errmsg": "获取成功",
+		"userinfo": EditReq{
+			Email:    user.Email,
+			NickName: user.NickName,
+			BirthDay: user.BirthDay,
+			Describe: user.Describe,
+		},
+	})
+
+	return
+}
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	// 声明你自己的要放进去 token 里面的数据
+	Uid int64
+	// 自己随便加
+	UserAgent string
 }
