@@ -68,7 +68,7 @@ sudo apt-get update
 sudo apt-get install helm
 
 #安装ingress
-root@master:~/webook# helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+
 root@master:~/webook/on_k8s# ll
 total 52
 drwxr-xr-x 3 root root 4096 Aug 18 06:43 ./
@@ -92,6 +92,9 @@ webook-mysql-service   NodePort    10.110.101.202   <none>        3308:30002/TCP
 webook-pod-service     ClusterIP   10.99.92.44      <none>        8081/TCP         128m
 webook-redis-service   NodePort    10.108.251.69    <none>        6380:30003/TCP   5h47m
 
+root@master:~/webook# kubectl get ingress -n webook
+NAME                  CLASS   HOSTS             ADDRESS        PORTS   AGE
+webook-live-ingress   nginx   ljy.ingress.com   10.108.21.42   80      79m
 
 root@master:~/webook# kubectl get pod -n webook
 NAME                              READY   STATUS    RESTARTS        AGE
@@ -100,10 +103,12 @@ webook-redis-7d88d5bc66-tqv67     1/1     Running   0               5h48m
 webook-service-847cbf5b58-76fr4   1/1     Running   0               5h39m
 webook-service-847cbf5b58-gjn8d   1/1     Running   0               5h39m
 
-root@master:~/webook# kubectl get svc -n ingress-nginx
-NAME                                 TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
-ingress-nginx-controller             NodePort    10.101.121.95    <none>        80:32473/TCP,443:30044/TCP   34d
-ingress-nginx-controller-admission   ClusterIP   10.102.220.156   <none>        443/TCP                      34d
+root@master:~/webook# kubectl get svc -n default
+NAME                                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
+ingress-nginx-controller             ClusterIP   10.108.21.42   <none>        80/TCP,443/TCP   3h49m
+ingress-nginx-controller-admission   ClusterIP   10.100.65.87   <none>        443/TCP          3h49m
+kubernetes                           ClusterIP   10.96.0.1      <none>        443/TCP          40d
+
 
 ```
 
@@ -113,5 +118,27 @@ ingress-nginx-controller-admission   ClusterIP   10.102.220.156   <none>        
 ![img_5.png](option_png%2Fimg_5.png)
 
 
-#通过ingress 访问 weboolk 服务(本地需要修改hosts 文件)
-![img_6.png](option_png%2Fimg_6.png)
+#通过ingress 访问 weboolk 服务
+```bash
+[root@HZ1LY_Mysql_Manage ~]# curl -s -XPOST -H "Host: ljy.ingress.com" -H'Content-Type: application/json' -d '{"email":"asxxxxxxxxxx@163.com","password":"xxxx@1xxxxxxxxx"}' http://154.221.17.220/users/loginJWT -v -k
+* About to connect() to 154.221.17.220 port 80 (#0)
+*   Trying 154.221.17.220...
+* Connected to 154.221.17.220 (154.221.17.220) port 80 (#0)
+> POST /users/loginJWT HTTP/1.1
+> User-Agent: curl/7.29.0
+> Accept: */*
+> Host: ljy.ingress.com
+> Content-Type: application/json
+> Content-Length: 61
+> 
+* upload completely sent off: 61 out of 61 bytes
+< HTTP/1.1 200 OK
+< Date: Sat, 19 Aug 2023 06:28:39 GMT
+< Content-Type: text/plain; charset=utf-8
+< Content-Length: 12
+< Connection: keep-alive
+< X-Jwt-Token: eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTI0MjY1NzksIlVpZCI6MSwiVXNlckFnZW50IjoiY3VybC83LjI5LjAifQ.8WoY03hPEwCK6gW5h4xXrpLIHbUILovfKVkZrceAqLs7Rpo6ElwkNQBqfHSrnGxpgd03LCh1FRWv-5eVuSuJww
+< 
+* Connection #0 to host 154.221.17.220 left intact
+登录成功
+```
