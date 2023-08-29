@@ -3,12 +3,14 @@ package middleware
 import (
 	"encoding/gob"
 	"fmt"
-	"gitee.com/geekbang/basic-go/webook/internal/web"
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+
+	"gitee.com/geekbang/basic-go/webook/internal/web"
 )
 
 // LoginMiddlewareBuilder 扩展性
@@ -83,7 +85,7 @@ func (l *LoginJWTMiddlewareBuilder) Build() gin.HandlerFunc {
 		//过期时间刷新
 		now := time.Now()
 		if now.Sub(claims.RegisteredClaims.ExpiresAt.Time) < time.Second*50 {
-			claims.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(time.Minute))
+			claims.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(time.Minute * 10))
 			token = jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 			tokenStr, err = token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
 			if err != nil {
@@ -94,5 +96,6 @@ func (l *LoginJWTMiddlewareBuilder) Build() gin.HandlerFunc {
 		}
 		//这里放进去的是指针对象
 		ctx.Set("claims", claims)
+		fmt.Println("火箭将获取到的对象是：", claims)
 	}
 }

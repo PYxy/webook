@@ -3,13 +3,16 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+
+	"golang.org/x/crypto/bcrypt"
+
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
 	"gitee.com/geekbang/basic-go/webook/internal/repository"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
-	ErrUserDuplicateEmail    = repository.ErrUserDuplicateEmail
+	ErrUserDuplicate         = repository.ErrUserDuplicate
 	ErrInvalidUserOrPassword = errors.New("账号/邮箱或密码不对")
 )
 
@@ -58,4 +61,29 @@ func (svc *UserService) Edit(ctx context.Context, u domain.User) error {
 
 func (svc *UserService) Select(ctx context.Context, id int64) (domain.User, error) {
 	return svc.repo.Select(ctx, id)
+}
+
+func (svc *UserService) CreateOrFind(ctx context.Context, phone string) (domain.User, error) {
+	u, err := svc.repo.FindByPhone(ctx, phone)
+	//快路径
+	if err != repository.ErrUserNotFound {
+		fmt.Println("?????")
+		// nil  会进来
+		// 有异常且 不是 没找到  就会走下面
+		return u, err
+	}
+	//慢路径
+	//没查到该用户 可以主动创建
+	u = domain.User{
+		Phone: phone,
+	}
+	//这一步可能存在冲突  需要判断如果是数据冲突 需要 往下走 查出对应的dao.user
+	err = svc.repo.Create(ctx, u)
+	if err != nil && err != repository.ErrUserDuplicate {
+		return u, err
+	}
+
+	//前端需要id  所以只能插入后直接  查询 (这口存在主从 数据未同步的异常)
+	return svc.repo.FindByPhone(ctx, phone)
+
 }

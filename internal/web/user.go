@@ -2,26 +2,29 @@ package web
 
 import (
 	"fmt"
-	"gitee.com/geekbang/basic-go/webook/internal/domain"
-	"gitee.com/geekbang/basic-go/webook/internal/service"
+	"net/http"
+	"time"
+
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	jwt "github.com/golang-jwt/jwt/v5"
-	"net/http"
-	"time"
+
+	"gitee.com/geekbang/basic-go/webook/internal/domain"
+	"gitee.com/geekbang/basic-go/webook/internal/service"
 )
 
 // UserHandler 我准备在它上面定义跟用户有关的路由
 type UserHandler struct {
 	svc         *service.UserService
+	codeSvc     *service.CodeService
 	emailExp    *regexp.Regexp
 	passwordExp *regexp.Regexp
 	valid       *validator.Validate
 }
 
-func NewUserHandler(svc *service.UserService) *UserHandler {
+func NewUserHandler(svc *service.UserService, codeSvc *service.CodeService) *UserHandler {
 	const (
 		emailRegexPattern    = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
 		passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
@@ -30,6 +33,7 @@ func NewUserHandler(svc *service.UserService) *UserHandler {
 	passwordExp := regexp.MustCompile(passwordRegexPattern, regexp.None)
 	return &UserHandler{
 		svc:         svc,
+		codeSvc:     codeSvc,
 		emailExp:    emailExp,
 		passwordExp: passwordExp,
 		valid:       validator.New(),
@@ -52,6 +56,126 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login", u.Login)
 	ug.POST("/loginJWT", u.LoginJWT)
 	ug.POST("/edit", u.Edit)
+
+	//短信验证登录 并按实际情况注册
+	ug.POST("/login_sms/code/send", u.SmsSend)
+	ug.POST("/login_sms", u.SmsLogin)
+}
+
+func (u *UserHandler) SmsSend(ctx *gin.Context) {
+	//获取前端的手机号码
+	type SmsReq struct {
+		Phone string `form:"phone" binding:"required,len=11"` //电话号码是必须的,而且要11位
+	}
+	var req SmsReq
+	err := ctx.ShouldBind(&req)
+	if err != nil {
+		//bing  有异常绑定处理  直接返回就行
+		fmt.Println(err.Error())
+		ctx.JSON(http.StatusOK, Result{
+			Code: 0,
+			Msg:  err.Error(),
+		})
+		return
+	}
+	//
+	err = u.codeSvc.Send(ctx, "login", req.Phone)
+	switch err {
+	case nil:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 1,
+			Msg:  "发送成功",
+		})
+	case service.ErrFrequentlyForSend:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 0,
+			//Msg: err.Error(),
+			Msg: "请求太频繁,请稍后重试",
+		})
+	default:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 0,
+			//Msg: err.Error(),
+			Msg: "系统异常",
+		})
+	}
+
+}
+func (u *UserHandler) SmsLogin(ctx *gin.Context) {
+	// 获取收集号码  以及验证码
+	type Req struct {
+		Phone string `form:"phone" binding:"required,len=11"` //电话号码是必须的,而且要11位
+		Code  string `form:"code" binding:"required,len=6"`   //验证码 6位
+	}
+	var req Req
+	err := ctx.ShouldBind(&req)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 0,
+			Msg:  "参数合法性验证失败",
+		})
+		return
+	}
+
+	ok, err := u.codeSvc.Verify(ctx, "login", req.Phone, req.Code)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	ctx.JSON(http.StatusOK, Result{
+	//		Code: 0,
+	//		Msg:  "系统异常",
+	//	})
+	//	return
+	//}
+	switch err {
+	case service.ErrAttack:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 0,
+			//Msg: err.Error(),
+			//获取到验证码之后,电话输错了 不太可能
+			Msg: "请停止请求",
+		})
+		return
+	case service.ErrCodeVerifyTooManyTimes:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 0,
+			//Msg: err.Error(),
+			Msg: "连续输入错误验证码多次,请稍后再试(重新获取验证码)",
+		})
+		return
+	}
+
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 0,
+			Msg:  "验证码有误",
+		})
+		return
+	}
+	fmt.Println("验证通过")
+	//手机号以及 验证码都输入正确
+	//
+	user, err := u.svc.CreateOrFind(ctx, req.Phone)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 0,
+			Msg:  "系统异常",
+		})
+		return
+	}
+	//保存jwt Token
+	fmt.Println(user.Id)
+	if err = u.setJWTToken(ctx, user.Id); err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 0,
+			Msg:  "系统异常",
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Code: 0,
+		Msg:  "验证码校验通过,登录成功",
+	})
+
 }
 
 func (u *UserHandler) SignUp(ctx *gin.Context) {
@@ -97,7 +221,7 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 		Email:    req.Email,
 		Password: req.Password,
 	})
-	if err == service.ErrUserDuplicateEmail {
+	if err == service.ErrUserDuplicate {
 		ctx.String(http.StatusOK, "邮箱冲突")
 		return
 	}
@@ -198,6 +322,7 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 		Describe string `form:"describe" validate:"omitempty,min=0,max=50" binding:"omitempty,min=0,max=50"`
 	}
 	var req EditReq
+	// 使用binding 标签
 	err := ctx.ShouldBind(&req)
 	if err != nil {
 		//bing  有异常绑定处理  直接返回就行
@@ -205,6 +330,7 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, "参数合法性验证失败")
 		return
 	}
+	//这要使用validate 标签
 	//err = u.valid.Struct(req)
 	//if err != nil {
 	//	ctx.JSON(http.StatusBadRequest, "参数合法性验证失败")
@@ -212,10 +338,15 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 	//}
 
 	//获取session信息 确认修改人是谁
-	val, _ := ctx.Get("userId")
+	//旧版本 的获取userId
+	//val, _ := ctx.Get("userId")
 
+	//JWT
+	val, _ := ctx.Get("claims")
+	claim, _ := val.(*UserClaims)
 	if err = u.svc.Edit(ctx, domain.User{
-		Id:       val.(int64),
+		//Id:       val.(int64),
+		Id:       claim.Uid,
 		NickName: req.NickName,
 		BirthDay: req.BirthDay,
 		Describe: req.Describe,
@@ -270,6 +401,7 @@ func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
 	}
 	val, _ := ctx.Get("claims")
 	claims, _ := val.(*UserClaims)
+	fmt.Println(claims.Uid)
 	user, err := u.svc.Select(ctx, claims.Uid)
 
 	if err != nil {
@@ -296,10 +428,33 @@ func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
 	return
 }
 
+func (u *UserHandler) setJWTToken(ctx *gin.Context, uid int64) error {
+	claims := UserClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
+		},
+		Uid:       uid,
+		UserAgent: ctx.Request.UserAgent(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	tokenStr, err := token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
+	if err != nil {
+		ctx.String(http.StatusInternalServerError, "系统错误")
+		return err
+	}
+	ctx.Header("x-jwt-token", tokenStr)
+	return nil
+}
+
 type UserClaims struct {
 	jwt.RegisteredClaims
 	// 声明你自己的要放进去 token 里面的数据
 	Uid int64
 	// 自己随便加
 	UserAgent string
+}
+
+type Result struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
 }

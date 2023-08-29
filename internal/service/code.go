@@ -1,0 +1,82 @@
+package service
+
+import (
+	"context"
+	"fmt"
+	"math/rand"
+	"time"
+
+	"gitee.com/geekbang/basic-go/webook/internal/repository"
+	"gitee.com/geekbang/basic-go/webook/internal/service/sms"
+)
+
+var (
+	ErrFrequentlyForSend      = repository.ErrFrequentlyForSend
+	ErrUnknownForCode         = repository.ErrUnknownForCode
+	ErrCodeVerifyTooManyTimes = repository.ErrCodeVerifyTooManyTimes
+	ErrAttack                 = repository.ErrAttack
+)
+
+func init() {
+	rand.Seed(time.Nanosecond.Nanoseconds())
+}
+
+//短信验证服务
+
+type CodeService struct {
+	//短信发送服务
+	sms sms.Service
+
+	//短信验证服务
+	repo *repository.CodeRepository
+	//code repo
+}
+
+func NewCodeService(sms sms.Service, repo *repository.CodeRepository) *CodeService {
+	return &CodeService{
+		sms:  sms,
+		repo: repo,
+	}
+}
+
+func (c *CodeService) Send(
+	ctx context.Context,
+//根据不同的业务场景,使用不同的字符串
+	biz string,
+//电话号码
+	phone string) error {
+
+	code := c.generateCode()
+	fmt.Println("生成的验证码: ", code)
+
+	//先保存在数据库
+	err := c.repo.Set(ctx, biz, phone, code, 3)
+
+	if err != nil {
+		return err
+	}
+
+	//发送验证码
+	err = c.sms.Send(ctx, []string{phone}, []sms.ArgVal{
+		{
+			Name: "code",
+			Val:  code,
+		},
+	})
+	//直接将结果放松到前面
+	return err
+
+}
+
+func (c *CodeService) Verify(ctx context.Context, biz, phone, code string) (bool, error) {
+
+	return c.repo.Verify(ctx, biz, phone, code)
+}
+
+func (c *CodeService) generateCode() string {
+	// 六位数，num 在 0, 999999 之间，包含 0 和 999999
+	num := rand.Intn(1000000)
+	// 不够六位的，加上前导 0
+	// 000001
+	return fmt.Sprintf("%06d", num)
+}

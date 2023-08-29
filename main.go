@@ -1,13 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"gitee.com/geekbang/basic-go/webook/config"
-	"gitee.com/geekbang/basic-go/webook/internal/repository"
-	"gitee.com/geekbang/basic-go/webook/internal/repository/dao"
-	"gitee.com/geekbang/basic-go/webook/internal/service"
-	"gitee.com/geekbang/basic-go/webook/internal/web"
-	"gitee.com/geekbang/basic-go/webook/internal/web/middleware"
+	"strings"
+	"time"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -15,8 +13,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"strings"
-	"time"
+
+	v9 "github.com/redis/go-redis/v9"
+
+	"gitee.com/geekbang/basic-go/webook/config"
+	"gitee.com/geekbang/basic-go/webook/internal/repository"
+	"gitee.com/geekbang/basic-go/webook/internal/repository/cache/local"
+	"gitee.com/geekbang/basic-go/webook/internal/repository/dao"
+	"gitee.com/geekbang/basic-go/webook/internal/service"
+	lc "gitee.com/geekbang/basic-go/webook/internal/service/sms/local"
+	"gitee.com/geekbang/basic-go/webook/internal/web"
+	"gitee.com/geekbang/basic-go/webook/internal/web/middleware"
 )
 
 /*
@@ -28,13 +35,13 @@ PS F:\git_push\webook>  go build -ldflags '-s -w' -o t99 .\main.go
 */
 
 func main() {
-	db := initDB()
+	db, cache := initDB()
 	server := initWebServer()
 
-	u := initUser(db)
+	u := initUser(db, cache)
 	u.RegisterRoutes(server)
 
-	server.Run(":8090")
+	server.Run(":8091")
 
 }
 
@@ -89,6 +96,7 @@ func initWebServer() *gin.Engine {
 	//TODO  这是使用JWT  进行登录验证
 	server.Use(middleware.NewLoginJWTMiddlewareBuilder().
 		IgnorePaths("/users/signup").
+		IgnorePaths("/users/login_sms/code/send").IgnorePaths("/users/login_sms").
 		IgnorePaths("/users/loginJWT").Build())
 	// v1
 	//middleware.IgnorePaths = []string{"sss"}
@@ -100,15 +108,23 @@ func initWebServer() *gin.Engine {
 	return server
 }
 
-func initUser(db *gorm.DB) *web.UserHandler {
+func initUser(db *gorm.DB, cache v9.Cmdable) *web.UserHandler {
+
 	ud := dao.NewUserDAO(db)
 	repo := repository.NewUserRepository(ud)
 	svc := service.NewUserService(repo)
-	u := web.NewUserHandler(svc)
+
+	localSms := &lc.Service{}
+	//codeCache := cache2.NewRedisCodeCache(cache)
+	//codeRepo := repository.NewCodeRepository(codeCache)
+	localCache := local.NewLocalCache()
+	codeRepo := repository.NewCodeRepository(localCache)
+	codeSvc := service.NewCodeService(localSms, codeRepo)
+	u := web.NewUserHandler(svc, codeSvc)
 	return u
 }
 
-func initDB() *gorm.DB {
+func initDB() (*gorm.DB, v9.Cmdable) {
 	db, err := gorm.Open(mysql.Open(fmt.Sprintf("%s?charset=utf8&timeout=4s", config.Config.DB.DSN)))
 	if err != nil {
 		// 我只会在初始化过程中 panic
@@ -116,10 +132,20 @@ func initDB() *gorm.DB {
 		// 一旦初始化过程出错，应用就不要启动了
 		panic(err)
 	}
-
 	err = dao.InitTable(db)
 	if err != nil {
 		panic(err)
 	}
-	return db
+	cache := v9.NewClient(&v9.Options{
+		Addr:     config.Config.Redis.Addr,
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+	err = cache.Conn().Ping(ctx).Err()
+	if err != nil {
+		panic("redis  连接失败")
+	}
+	return db, cache
 }
