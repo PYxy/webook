@@ -96,6 +96,6 @@ func (l *LoginJWTMiddlewareBuilder) Build() gin.HandlerFunc {
 		}
 		//这里放进去的是指针对象
 		ctx.Set("claims", claims)
-		fmt.Println("火箭将获取到的对象是：", claims)
+		//fmt.Println("火箭将获取到的对象是：", claims)
 	}
 }

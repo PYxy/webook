@@ -8,7 +8,7 @@ import (
 )
 
 func TestNewLocalCache(t *testing.T) {
-	l_cache := NewLocalCache()
+	l_cache := NewLocalSmsCache()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 	fmt.Println("操作结果:", l_cache.Set(ctx, "login", "13719088000", "789789", 3))

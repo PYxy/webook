@@ -17,14 +17,17 @@ import (
 
 // UserHandler 我准备在它上面定义跟用户有关的路由
 type UserHandler struct {
-	svc         *service.UserService
-	codeSvc     *service.CodeService
+	svc         service.UserService
+	codeSvc     service.CodeService
 	emailExp    *regexp.Regexp
 	passwordExp *regexp.Regexp
 	valid       *validator.Validate
 }
 
-func NewUserHandler(svc *service.UserService, codeSvc *service.CodeService) *UserHandler {
+// 确保 UserHandler 上实现了 handler 接口
+//var _ handler = (*UserHandler)(nil)
+
+func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserHandler {
 	const (
 		emailRegexPattern    = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
 		passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
@@ -132,7 +135,7 @@ func (u *UserHandler) SmsLogin(ctx *gin.Context) {
 			Code: 0,
 			//Msg: err.Error(),
 			//获取到验证码之后,电话输错了 不太可能
-			Msg: "请停止请求",
+			Msg: "请停止请求,或重新发送验证码登录",
 		})
 		return
 	case service.ErrCodeVerifyTooManyTimes:
@@ -366,7 +369,7 @@ func (u *UserHandler) Profile(ctx *gin.Context) {
 		Describe string `json:"describe"`
 	}
 	val, _ := ctx.Get("userId")
-	user, err := u.svc.Select(ctx, val.(int64))
+	user, err := u.svc.FindById(ctx, val.(int64))
 
 	if err != nil {
 		fmt.Println("数据获取失败:", err)
@@ -402,7 +405,7 @@ func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
 	val, _ := ctx.Get("claims")
 	claims, _ := val.(*UserClaims)
 	fmt.Println(claims.Uid)
-	user, err := u.svc.Select(ctx, claims.Uid)
+	user, err := u.svc.FindById(ctx, claims.Uid)
 
 	if err != nil {
 		fmt.Println("数据获取失败:", err)

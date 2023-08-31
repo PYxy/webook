@@ -35,10 +35,14 @@ PS F:\git_push\webook>  go build -ldflags '-s -w' -o t99 .\main.go
 */
 
 func main() {
+	//TODO 数据库连接对象初始化
 	db, cache := initDB()
+	//gin 服务初始化
 	server := initWebServer()
-
+	// 初始化 UserHandle
 	u := initUser(db, cache)
+
+	//路由注册
 	u.RegisterRoutes(server)
 
 	server.Run(":8091")
@@ -111,13 +115,14 @@ func initWebServer() *gin.Engine {
 func initUser(db *gorm.DB, cache v9.Cmdable) *web.UserHandler {
 
 	ud := dao.NewUserDAO(db)
-	repo := repository.NewUserRepository(ud)
+	uc := local.NewUserCache()
+	repo := repository.NewUserRepository(ud, uc)
 	svc := service.NewUserService(repo)
 
 	localSms := &lc.Service{}
 	//codeCache := cache2.NewRedisCodeCache(cache)
 	//codeRepo := repository.NewCodeRepository(codeCache)
-	localCache := local.NewLocalCache()
+	localCache := local.NewLocalSmsCache()
 	codeRepo := repository.NewCodeRepository(localCache)
 	codeSvc := service.NewCodeService(localSms, codeRepo)
 	u := web.NewUserHandler(svc, codeSvc)

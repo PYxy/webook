@@ -14,16 +14,14 @@ import (
 	ca "github.com/patrickmn/go-cache"
 )
 
-type Cache struct {
+type SmsCache struct {
 	client *ca.Cache
 	onDo   map[string]*inner
 	mutex  sync.RWMutex
 }
 
-type doFunc func(string, int, string, int) error
-
-func NewLocalCache() *Cache {
-	return &Cache{
+func NewLocalSmsCache() *SmsCache {
+	return &SmsCache{
 		// 设置超时时间和清理时间
 		client: ca.New(5*time.Minute, 10*time.Minute),
 		onDo:   make(map[string]*inner, 10),
@@ -31,7 +29,7 @@ func NewLocalCache() *Cache {
 	}
 }
 
-func (c *Cache) Set(ctx context.Context, biz, phone, code string, cnt int) error {
+func (c *SmsCache) Set(ctx context.Context, biz, phone, code string, cnt int) error {
 	//TODO implement me
 	//c.client.Set("nihao", "a", time.Second*10)
 	//val, err := c.client.Get("nihao")
@@ -104,13 +102,13 @@ func (c *Cache) Set(ctx context.Context, biz, phone, code string, cnt int) error
 	return err
 }
 
-func (c *Cache) Verify(ctx context.Context, biz, phone, code string) (bool, error) {
+func (c *SmsCache) Verify(ctx context.Context, biz, phone, code string) (bool, error) {
 	key := c.GenerateKey(biz, phone)
 	return c.Do(ctx, key, code, 0, "GET")
 }
 
 // Do 兼容原有的接口必须2个返回值
-func (c *Cache) Do(ctx context.Context, key string, code string, cnt int, action string) (bool, error) {
+func (c *SmsCache) Do(ctx context.Context, key string, code string, cnt int, action string) (bool, error) {
 	c.mutex.RLock()
 	in, ok := c.onDo[key]
 	//有人在操作
@@ -141,7 +139,7 @@ func (c *Cache) Do(ctx context.Context, key string, code string, cnt int, action
 		c.mutex.RUnlock()
 		//没有人操作
 		c.mutex.Lock() //这里可能有人抢锁了
-
+		//这里可能等待的时间会很长 拿到锁马上判断一次是不是超时了
 		if ctx.Err() != nil {
 			c.mutex.Unlock()
 			return true, ctx.Err()
@@ -190,12 +188,11 @@ func (c *Cache) Do(ctx context.Context, key string, code string, cnt int, action
 	}
 }
 
-func (c *Cache) GenerateKey(biz, phone string) string {
+func (c *SmsCache) GenerateKey(biz, phone string) string {
 	return fmt.Sprintf("code:%s:%s", biz, phone)
 }
 
-// Put
-func (c *Cache) Put(key string, onWait int64, code string, cnt int) (err error) {
+func (c *SmsCache) Put(key string, onWait int64, code string, cnt int) (err error) {
 	//直接操作内存
 	defer func() {
 		c.mutex.Lock()
@@ -236,6 +233,7 @@ func (c *Cache) Put(key string, onWait int64, code string, cnt int) (err error) 
 			cnt:  cnt,
 			code: code,
 		}
+		fmt.Println("修改内存的值1")
 		c.client.Set(key, curVal, time.Second*60)
 	} else {
 		//没有保存过或者已经过期
@@ -243,6 +241,7 @@ func (c *Cache) Put(key string, onWait int64, code string, cnt int) (err error) 
 			cnt:  cnt,
 			code: code,
 		}
+		fmt.Println("修改内存的值2")
 		c.client.Set(key, curVal, time.Second*60)
 
 	}
@@ -251,7 +250,7 @@ func (c *Cache) Put(key string, onWait int64, code string, cnt int) (err error) 
 
 }
 
-func (c *Cache) Get(key string, onWait int64, code string) (bool, error) {
+func (c *SmsCache) Get(key string, onWait int64, code string) (bool, error) {
 	//return false, nil
 	//直接操作内存
 	defer func() {
@@ -277,6 +276,7 @@ func (c *Cache) Get(key string, onWait int64, code string) (bool, error) {
 	val, timeExpire, ok := c.client.GetWithExpiration(key)
 	if !ok {
 		//验证的时候查询不到对的key
+		fmt.Println("是攻击 或者 是上一次登录成功 又登录")
 		return false, cache.ErrAttack
 		//判断是不是少于10
 	} else {
@@ -289,14 +289,17 @@ func (c *Cache) Get(key string, onWait int64, code string) (bool, error) {
 			fmt.Println("密码正确")
 			tmpInCache.cnt = -1
 			//重新设置  按照之前的过期时间
-			c.client.Set(key, tmpInCache, time.Duration(timeExpire.UnixMilli())*time.Millisecond)
+			c.client.Set(key, tmpInCache, time.Second*60)
+			//直接删除 可能会有大量攻击
+			//c.client.Delete(key)
 			return true, nil
 		} else {
 			fmt.Println("验证码输入错误")
 			//验证码输入错误
 			tmpInCache.cnt -= 1
 			//重新设置  按照之前的过期时间
-			c.client.Set(key, tmpInCache, time.Duration(timeExpire.UnixMilli())*time.Millisecond)
+
+			c.client.Set(key, tmpInCache, time.Duration(timeExpire.Second())*time.Second)
 			return false, nil
 		}
 

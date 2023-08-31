@@ -13,23 +13,28 @@ var (
 	ErrAttack                 = cache.ErrAttack
 )
 
-type CodeRepository struct {
-	cache cache.Cache
+type CodeRepository interface {
+	Set(ctx context.Context, biz, phone, code string, cnt int) error
+	Verify(ctx context.Context, biz, phone, code string) (bool, error)
 }
 
-func NewCodeRepository(cache cache.Cache) *CodeRepository {
-	return &CodeRepository{
+type CacheCodeRepository struct {
+	cache cache.SmsCache
+}
+
+func NewCodeRepository(cache cache.SmsCache) CodeRepository {
+	return &CacheCodeRepository{
 		cache: cache,
 	}
 }
 
-func (c *CodeRepository) Set(ctx context.Context, biz, phone, code string, cnt int) error {
+func (c *CacheCodeRepository) Set(ctx context.Context, biz, phone, code string, cnt int) error {
 	//键：验证码
 	//cnt  最多尝试次数
 	return c.cache.Set(ctx, biz, phone, code, cnt)
 }
 
-func (c *CodeRepository) Verify(ctx context.Context, biz, phone, code string) (bool, error) {
+func (c *CacheCodeRepository) Verify(ctx context.Context, biz, phone, code string) (bool, error) {
 	return c.cache.Verify(ctx, biz, phone, code)
 
 }

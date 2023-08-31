@@ -26,6 +26,12 @@ func NewUserDAO(db *gorm.DB) *UserDAO {
 	}
 }
 
+//func (dao *UserDAO) FindById(ctx context.Context, id int64) (User, error) {
+//	var u User
+//	err := dao.db.WithContext(ctx).Where("`id` = ?", id).First(&u).Error
+//	return u, err
+//}
+
 func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
 	var u User
 	err := dao.db.WithContext(ctx).Where("email = ?", email).First(&u).Error
@@ -63,7 +69,7 @@ func (dao *UserDAO) Update(ctx context.Context, u User) error {
 
 }
 
-func (dao *UserDAO) Select(ctx context.Context, id int64) (u User, err error) {
+func (dao *UserDAO) FindById(ctx context.Context, id int64) (u User, err error) {
 	err = dao.db.WithContext(ctx).Model(&User{}).Where(&User{Id: id}).First(&u).Error
 	return
 }
