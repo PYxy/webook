@@ -31,7 +31,7 @@ type CodeService interface {
 	Verify(ctx context.Context, biz, phone, code string) (bool, error)
 }
 
-// 短信验证服务
+// 短信+验证服务
 type codeService struct {
 	//短信发送服务
 	sms sms.Service

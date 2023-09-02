@@ -142,3 +142,31 @@ kubernetes                           ClusterIP   10.96.0.1      <none>        44
 * Connection #0 to host 154.221.17.220 left intact
 登录成功
 ```
+
+wire
+```bash
+#wire 安装
+go install github.com/google/wire/cmd/wire
+go get github.com/google/wire/cmd/wire
+
+wire.go 文件路径下
+
+wire
+
+
+项目启动命令: go run .\main.go .\wire_gen.go
+```
+
+
+mock
+```bash
+#linux
+root@master:~/webook# mockgen -source=./internal/service/user.go  -package=svcmocks -destination=./internal/ervice/mocks/user_mock.go
+root@master:~/webook# mockgen -source=./internal/service/code.go  -package=svcmocks -destination=./internal/ervice/mocks/code_mock.go
+#window 
+PS F:\git_push\webook\internal\web> mockgen -source=F:\git_push\webook\internal\service\user.go  -package=svcmocks -destination=F:\git_push\webook\internal\service\mocks\user_mock.go
+PS F:\git_push\webook\internal\web> mockgen -source=F:\git_push\webook\internal\service\code.go  -package=svcmocks -destination=F:\git_push\webook\internal\service\mocks\code_mock.go
+
+
+
+```

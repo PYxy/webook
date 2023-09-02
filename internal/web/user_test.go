@@ -1,10 +1,26 @@
 package web
 
 import (
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/bcrypt"
+	"bytes"
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/bcrypt"
+
+	"go.uber.org/mock/gomock"
+
+	"gitee.com/geekbang/basic-go/webook/internal/domain"
+	"gitee.com/geekbang/basic-go/webook/internal/service"
+	svcmocks "gitee.com/geekbang/basic-go/webook/internal/service/mocks"
 )
+
+// go test -v .
 
 func TestEncrypt(t *testing.T) {
 	password := "hello#world123"
@@ -14,4 +30,155 @@ func TestEncrypt(t *testing.T) {
 	}
 	err = bcrypt.CompareHashAndPassword(encrypted, []byte(password))
 	assert.NoError(t, err)
+}
+
+func TestUserHandler_SignUp(t *testing.T) {
+	testCases := []struct {
+		name     string
+		mock     func(ctrl *gomock.Controller) (service.UserService, service.CodeService)
+		reqBody  string
+		wantCode int
+		wantBody string
+	}{
+
+		{
+			name: "正常注册",
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+				user := svcmocks.NewMockUserService(ctrl)
+				//写法1
+				//user.EXPECT().SignUp(gomock.Any(), gomock.Any()).Return(nil)
+				//写法2  因为这个对象 是要跟request 对象的匹配上的
+				user.EXPECT().SignUp(gomock.Any(), domain.User{
+					Email:    "asxxxxxxxxxx@169.com",
+					Password: "xxxx@1xxxxxxxxx",
+				}).Return(nil)
+				code := svcmocks.NewMockCodeService(ctrl)
+				return user, code
+			},
+			reqBody:  `{"email":"asxxxxxxxxxx@169.com","confirmPassword":"xxxx@1xxxxxxxxx","password":"xxxx@1xxxxxxxxx"}`,
+			wantCode: http.StatusOK,
+			wantBody: "注册成功",
+		},
+		{
+			name: "参数绑定失败",
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+				user := svcmocks.NewMockUserService(ctrl)
+				code := svcmocks.NewMockCodeService(ctrl)
+				return user, code
+			},
+			reqBody:  `{"email":"asxxxxxxxxxx@169.com","confirmPassword":"xxxx@1xxxxxxxxx","password":"xxxx@1xxxxxxxxx",}`,
+			wantCode: http.StatusBadRequest,
+			wantBody: "",
+		},
+		{
+			name: "邮箱格式有误",
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+				user := svcmocks.NewMockUserService(ctrl)
+				code := svcmocks.NewMockCodeService(ctrl)
+				return user, code
+			},
+			reqBody:  `{"email":"asxxxxxxxxxx169.com","confirmPassword":"xxxx@1xxxxxxxxx","password":"xxxx@1xxxxxxxxx"}`,
+			wantCode: http.StatusOK,
+			wantBody: "你的邮箱格式不对",
+		},
+		{
+			name: "两次输入的密码不一致",
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+				user := svcmocks.NewMockUserService(ctrl)
+				code := svcmocks.NewMockCodeService(ctrl)
+				return user, code
+			},
+			reqBody:  `{"email":"asxxxxxxxxxx@169.com","confirmPassword":"xxxx@1xxxxxxxxx1","password":"xxxx@1xxxxxxxxx"}`,
+			wantCode: http.StatusOK,
+			wantBody: "两次输入的密码不一致",
+		},
+		{
+			name: "密码必须大于8位，包含数字、特殊字符",
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+				user := svcmocks.NewMockUserService(ctrl)
+				code := svcmocks.NewMockCodeService(ctrl)
+				return user, code
+			},
+			reqBody:  `{"email":"asxxxxxxxxxx@169.com","confirmPassword":"xxxxxxxxxxxxx","password":"xxxxxxxxxxxxx"}`,
+			wantCode: http.StatusOK,
+			wantBody: "密码必须大于8位，包含数字、特殊字符",
+		},
+		{
+			name: "邮箱冲突",
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+				user := svcmocks.NewMockUserService(ctrl)
+				//写法1
+				//user.EXPECT().SignUp(gomock.Any(), gomock.Any()).Return(nil)
+				//写法2  因为这个对象 是要跟request 对象的匹配上的
+				user.EXPECT().SignUp(gomock.Any(), domain.User{
+					Email:    "asxxxxxxxxxx@169.com",
+					Password: "xxxx@1xxxxxxxxx",
+				}).Return(service.ErrUserDuplicate)
+				code := svcmocks.NewMockCodeService(ctrl)
+				return user, code
+			},
+			reqBody:  `{"email":"asxxxxxxxxxx@169.com","confirmPassword":"xxxx@1xxxxxxxxx","password":"xxxx@1xxxxxxxxx"}`,
+			wantCode: http.StatusOK,
+			wantBody: "邮箱冲突",
+		},
+		{
+			name: "系统异常",
+			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+				user := svcmocks.NewMockUserService(ctrl)
+				//写法1
+				//user.EXPECT().SignUp(gomock.Any(), gomock.Any()).Return(nil)
+				//写法2  因为这个对象 是要跟request 对象的匹配上的
+				user.EXPECT().SignUp(gomock.Any(), domain.User{
+					Email:    "asxxxxxxxxxx@169.com",
+					Password: "xxxx@1xxxxxxxxx",
+				}).Return(errors.New("系统异常"))
+				code := svcmocks.NewMockCodeService(ctrl)
+				return user, code
+			},
+			reqBody:  `{"email":"asxxxxxxxxxx@169.com","confirmPassword":"xxxx@1xxxxxxxxx","password":"xxxx@1xxxxxxxxx"}`,
+			wantCode: http.StatusOK,
+			wantBody: "系统异常",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			server := gin.New()
+			h := NewUserHandler(tc.mock(ctrl))
+			h.RegisterRoutes(server)
+
+			req, err := http.NewRequest(http.MethodPost, "/users/signup", bytes.NewBuffer([]byte(tc.reqBody)))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			//用于接收resp
+			resp := httptest.NewRecorder()
+
+			server.ServeHTTP(resp, req)
+			assert.Equal(t, tc.wantCode, resp.Code)
+			assert.Equal(t, tc.wantBody, resp.Body.String())
+		})
+	}
+}
+
+func TestMock(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	usersvc := svcmocks.NewMockUserService(ctrl)
+
+	//Times(1)  预估运行多少次
+	usersvc.EXPECT().SignUp(gomock.Any(), gomock.Any()).Times(1).
+		Return(errors.New("mock error"))
+
+	//usersvc.EXPECT().SignUp(gomock.Any(), domain.User{
+	//	Email: "124@qq.com",
+	//}).Return(errors.New("mock error"))
+
+	err := usersvc.SignUp(context.Background(), domain.User{
+		Email: "123@qq.com",
+	})
+	t.Log(err)
 }

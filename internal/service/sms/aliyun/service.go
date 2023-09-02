@@ -26,14 +26,15 @@ type Service struct {
 	regionId        string
 }
 
-func NewService(accessKey,
+// NewAliyunService 使用wrie 要多包一层 或者变量用全局变量
+func NewAliyunService(accessID,
 	accessKeySecret,
 	regionId,
 	signName,
 	templateCode string) *Service {
 	config := sdk.NewConfig()
 	config.WithTimeout(time.Second * 5)
-	credential := credentials.NewAccessKeyCredential(accessKey, accessKeySecret)
+	credential := credentials.NewAccessKeyCredential(accessID, accessKeySecret)
 	client, err := dysmsapi.NewClientWithOptions(regionId, config, credential)
 	if err != nil {
 		panic(err)

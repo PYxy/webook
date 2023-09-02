@@ -20,7 +20,7 @@ type UserDAO struct {
 	db *gorm.DB
 }
 
-func NewUserDAO(db *gorm.DB) *UserDAO {
+func NewUserDAO(db *gorm.DB) UserDaoInterface {
 	return &UserDAO{
 		db: db,
 	}

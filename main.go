@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
@@ -34,7 +33,7 @@ PS F:\git_push\webook>  go build -ldflags '-s -w' -o t99 .\main.go
 
 */
 
-func main() {
+func main1() {
 	//TODO 数据库连接对象初始化
 	db, cache := initDB()
 	//gin 服务初始化
@@ -47,6 +46,11 @@ func main() {
 
 	server.Run(":8091")
 
+}
+
+func main() {
+	engine := InitWebServer()
+	engine.Run(":8787")
 }
 
 func initWebServer() *gin.Engine {
@@ -79,7 +83,7 @@ func initWebServer() *gin.Engine {
 	}))
 	//TODO session 配置
 	//步骤1使用内存存储session
-	store := cookie.NewStore([]byte("secret"))
+	//store := cookie.NewStore([]byte("secret"))
 
 	//使用redis 存储session
 	store, err := redis.NewStore(16, "tcp", config.Config.Redis.Addr, "",
@@ -114,17 +118,40 @@ func initWebServer() *gin.Engine {
 
 func initUser(db *gorm.DB, cache v9.Cmdable) *web.UserHandler {
 
+	//user svc 构建
 	ud := dao.NewUserDAO(db)
 	uc := local.NewUserCache()
 	repo := repository.NewUserRepository(ud, uc)
 	svc := service.NewUserService(repo)
 
-	localSms := &lc.Service{}
+	//code svc 构建
+
+	//本地短信服务
+	localSms := lc.NewLocalSmsService()
+
+	//阿里云短信服务
+	//alSms := aliyun.NewAliyunService(
+	//	"",
+	//	"",
+	//	"cn-hangzhou",
+	//	"阿里云短信测试",
+	//	"SMS_154950909",
+	//)
+
+	//redis短信验证服务
 	//codeCache := cache2.NewRedisCodeCache(cache)
 	//codeRepo := repository.NewCodeRepository(codeCache)
+
+	//本地短信验证服务
 	localCache := local.NewLocalSmsCache()
 	codeRepo := repository.NewCodeRepository(localCache)
+
+	//使用本地短信(只打印出来验证码 不发短信 用于测试)
 	codeSvc := service.NewCodeService(localSms, codeRepo)
+
+	//使用阿里云 发送短信
+	//codeSvc := service.NewCodeService(alSms, codeRepo)
+
 	u := web.NewUserHandler(svc, codeSvc)
 	return u
 }

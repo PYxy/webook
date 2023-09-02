@@ -10,13 +10,14 @@ import (
 	ca "github.com/patrickmn/go-cache"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
+	"gitee.com/geekbang/basic-go/webook/internal/repository/cache"
 )
 
 type UserCache struct {
 	client *ca.Cache
 }
 
-func NewUserCache() *UserCache {
+func NewUserCache() cache.UserCache {
 
 	return &UserCache{
 		client: ca.New(5*time.Minute, 10*time.Minute),

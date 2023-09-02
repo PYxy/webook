@@ -15,7 +15,7 @@ import (
 	"gitee.com/geekbang/basic-go/webook/internal/service"
 )
 
-// UserHandler 我准备在它上面定义跟用户有关的路由
+// UserHandler User服务路由定义
 type UserHandler struct {
 	svc         service.UserService
 	codeSvc     service.CodeService
@@ -24,7 +24,7 @@ type UserHandler struct {
 	valid       *validator.Validate
 }
 
-// 确保 UserHandler 上实现了 handler 接口
+// 假定 UserHandler 上实现了 handler 接口
 //var _ handler = (*UserHandler)(nil)
 
 func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserHandler {
@@ -104,6 +104,7 @@ func (u *UserHandler) SmsSend(ctx *gin.Context) {
 	}
 
 }
+
 func (u *UserHandler) SmsLogin(ctx *gin.Context) {
 	// 获取收集号码  以及验证码
 	type Req struct {

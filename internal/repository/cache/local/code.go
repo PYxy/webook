@@ -20,7 +20,7 @@ type SmsCache struct {
 	mutex  sync.RWMutex
 }
 
-func NewLocalSmsCache() *SmsCache {
+func NewLocalSmsCache() cache.SmsCache {
 	return &SmsCache{
 		// 设置超时时间和清理时间
 		client: ca.New(5*time.Minute, 10*time.Minute),
