@@ -36,6 +36,7 @@ func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error)
 	var u User
 	err := dao.db.WithContext(ctx).Where("email = ?", email).First(&u).Error
 	//err := dao.db.WithContext(ctx).First(&u, "email = ?", email).Error
+	//gorm.ErrRecordNotFound
 	return u, err
 }
 

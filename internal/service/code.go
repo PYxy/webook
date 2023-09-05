@@ -38,7 +38,7 @@ type codeService struct {
 
 	//短信验证服务
 	repo repository.CodeRepository
-	//code repo
+	//code mock
 }
 
 func NewCodeService(sms sms.Service, repo repository.CodeRepository) CodeService {

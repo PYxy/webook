@@ -161,12 +161,27 @@ wire
 mock
 ```bash
 #linux
-root@master:~/webook# mockgen -source=./internal/service/user.go  -package=svcmocks -destination=./internal/ervice/mocks/user_mock.go
-root@master:~/webook# mockgen -source=./internal/service/code.go  -package=svcmocks -destination=./internal/ervice/mocks/code_mock.go
+root@master:~/webook# mockgen -source=./internal/service/user.go  -package=svcmocks -destination=./internal/service/mocks/user_mock.go
+root@master:~/webook# mockgen -source=./internal/service/code.go  -package=svcmocks -destination=./internal/service/mocks/code_mock.go
 #window 
 PS F:\git_push\webook\internal\web> mockgen -source=F:\git_push\webook\internal\service\user.go  -package=svcmocks -destination=F:\git_push\webook\internal\service\mocks\user_mock.go
 PS F:\git_push\webook\internal\web> mockgen -source=F:\git_push\webook\internal\service\code.go  -package=svcmocks -destination=F:\git_push\webook\internal\service\mocks\code_mock.go
 
 
+ 
+PS F:\git_push\webook\internal\web> mockgen -source=F:\git_push\webook\internal\repository\user.go  -package=svcmocks -destination=F:\git_push\webook\internal\repository\mocks\user_mock.go
+PS F:\git_push\webook\internal\web> mockgen -source=F:\git_push\webook\internal\repository\code.go  -package=svcmocks -destination=F:\git_push\webook\internal\repository\mocks\code_mock.go
+
+
+```
+
+test
+```bash
+
+#测试当前测试文件中 能匹配 TestUserHandler_LoginJWT 字符串的函数(正则) -v 详细信息
+go test -run="TestUserHandler_LoginJWT" -v
+
+#当前测试文件的所有测试
+go test -v
 
 ```
