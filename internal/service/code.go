@@ -15,6 +15,7 @@ var (
 	ErrUnknownForCode         = repository.ErrUnknownForCode
 	ErrCodeVerifyTooManyTimes = repository.ErrCodeVerifyTooManyTimes
 	ErrAttack                 = repository.ErrAttack
+	ErrUnKnow                 = repository.ErrKnow
 )
 
 func init() {

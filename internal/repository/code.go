@@ -11,6 +11,7 @@ var (
 	ErrUnknownForCode         = cache.ErrUnknownForCode
 	ErrCodeVerifyTooManyTimes = cache.ErrCodeVerifyTooManyTimes
 	ErrAttack                 = cache.ErrAttack
+	ErrKnow                   = cache.ErrUnknown
 )
 
 type CodeRepository interface {

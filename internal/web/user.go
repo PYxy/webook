@@ -146,6 +146,13 @@ func (u *UserHandler) SmsLogin(ctx *gin.Context) {
 			Msg: "连续输入错误验证码多次,请稍后再试(重新获取验证码)",
 		})
 		return
+	case service.ErrUnKnow:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 0,
+			//Msg: err.Error(),
+			Msg: "未知错误",
+		})
+		return
 	}
 
 	if !ok {
@@ -167,7 +174,7 @@ func (u *UserHandler) SmsLogin(ctx *gin.Context) {
 		return
 	}
 	//保存jwt Token
-	fmt.Println(user.Id)
+	//fmt.Println(user.Id)
 	if err = u.setJWTToken(ctx, user.Id); err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 0,
