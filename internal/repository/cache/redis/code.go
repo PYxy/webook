@@ -34,6 +34,7 @@ func (c *CodeRedisCache) Set(ctx context.Context, biz, phone, code string, cnt i
 	result, err := c.client.Eval(ctx, luaSetCode, []string{c.GenerateKey(biz, phone)}, code, 600, 90, cnt).Int()
 	fmt.Println(result, err)
 	if err != nil {
+		//超时 获取；连接中断的情况
 		return err
 	}
 	switch result {

@@ -172,6 +172,12 @@ PS F:\git_push\webook\internal\web> mockgen -source=F:\git_push\webook\internal\
 PS F:\git_push\webook\internal\web> mockgen -source=F:\git_push\webook\internal\repository\user.go  -package=svcmocks -destination=F:\git_push\webook\internal\repository\mocks\user_mock.go
 PS F:\git_push\webook\internal\web> mockgen -source=F:\git_push\webook\internal\repository\code.go  -package=svcmocks -destination=F:\git_push\webook\internal\repository\mocks\code_mock.go
 
+PS F:\git_push\webook\internal\web> mockgen -source=F:\git_push\webook\internal\repository\dao\type.go  -package=daomocks -destination=F:\git_push\webook\internal\repository\dao\mocks\user_mock.go
+PS F:\git_push\webook\internal\web> mockgen -source=F:\git_push\webook\internal\repository\cache\type.go  -package=cachemocks -destination=F:\git_push\webook\internal\repository\cache\mocks\user_mock.go
+
+
+#根据Cmdable interface  
+PS F:\git_push\webook\internal\web> mockgen -source=D:\GOPro\pkg\mod\github.com\redis\go-redis\v9@v9.1.0\commands.go  -package=redismocks -destination=F:\git_push\webook\internal\repository\cache\redis\mocks\redis_mock.go
 
 ```
 

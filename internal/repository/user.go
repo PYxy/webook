@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
@@ -89,6 +90,7 @@ func (r *CacheUserRepository) FindById(ctx context.Context, id int64) (domain.Us
 		err = r.cache.Set(ctx, u)
 		if err != nil {
 			//打日志告警
+			fmt.Println("异步写入缓存失败:", err)
 		}
 
 	}()
