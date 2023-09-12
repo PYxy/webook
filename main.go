@@ -20,7 +20,7 @@ import (
 	"gitee.com/geekbang/basic-go/webook/internal/repository/cache/local"
 	"gitee.com/geekbang/basic-go/webook/internal/repository/dao"
 	"gitee.com/geekbang/basic-go/webook/internal/service"
-	lc "gitee.com/geekbang/basic-go/webook/internal/service/sms/local"
+	"gitee.com/geekbang/basic-go/webook/internal/service/sms/aliyun"
 	"gitee.com/geekbang/basic-go/webook/internal/web"
 	"gitee.com/geekbang/basic-go/webook/internal/web/middleware"
 )
@@ -33,7 +33,7 @@ PS F:\git_push\webook>  go build -ldflags '-s -w' -o t99 .\main.go
 
 */
 
-func main1() {
+func main() {
 	//TODO 数据库连接对象初始化
 	db, cache := initDB()
 	//gin 服务初始化
@@ -48,10 +48,10 @@ func main1() {
 
 }
 
-func main() {
-	engine := InitWebServer()
-	engine.Run(":8787")
-}
+//func main2() {
+//	engine := InitWebServer()
+//	engine.Run(":8787")
+//}
 
 func initWebServer() *gin.Engine {
 	server := gin.Default()
@@ -127,16 +127,16 @@ func initUser(db *gorm.DB, cache v9.Cmdable) *web.UserHandler {
 	//code svc 构建
 
 	//本地短信服务
-	localSms := lc.NewLocalSmsService()
+	//localSms := lc.NewLocalSmsService()
 
 	//阿里云短信服务
-	//alSms := aliyun.NewAliyunService(
-	//	"",
-	//	"",
-	//	"cn-hangzhou",
-	//	"阿里云短信测试",
-	//	"SMS_154950909",
-	//)
+	alSms := aliyun.NewAliyunService(
+		"LTAI5tRXqWrLkYN1qrMGyp8U",
+		"JXqo4X5UvLsQefUjZlqItcd1GlacQp",
+		"cn-hangzhou",
+		"阿里云短信测试",
+		"SMS_154950909",
+	)
 
 	//redis短信验证服务
 	//codeCache := cache2.NewRedisCodeCache(cache)
@@ -147,7 +147,7 @@ func initUser(db *gorm.DB, cache v9.Cmdable) *web.UserHandler {
 	codeRepo := repository.NewCodeRepository(localCache)
 
 	//使用本地短信(只打印出来验证码 不发短信 用于测试)
-	codeSvc := service.NewCodeService(localSms, codeRepo)
+	codeSvc := service.NewCodeService(alSms, codeRepo)
 
 	//使用阿里云 发送短信
 	//codeSvc := service.NewCodeService(alSms, codeRepo)

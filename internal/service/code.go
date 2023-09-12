@@ -67,13 +67,14 @@ func (c *codeService) Send(
 	}
 
 	//发送验证码
-	err = c.sms.Send(ctx, []string{phone}, []sms.ArgVal{
+	//biz 可以写死 或者从前端哪里获取(jwt 的使用)
+	err = c.sms.Send(ctx, biz, []string{phone}, []sms.ArgVal{
 		{
 			Name: "code",
 			Val:  code,
 		},
 	})
-	//直接将结果放松到前面
+	//直接将结果给到前面
 	return err
 
 }

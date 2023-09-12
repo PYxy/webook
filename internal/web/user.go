@@ -81,7 +81,8 @@ func (u *UserHandler) SmsSend(ctx *gin.Context) {
 		})
 		return
 	}
-	//
+	//biz  可以写死
+	// 如果需要验证的话  需要前端来传(就是后面的JWT 验证)
 	err = u.codeSvc.Send(ctx, "login", req.Phone)
 	switch err {
 	case nil:

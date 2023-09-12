@@ -27,7 +27,8 @@ type Service struct {
 }
 
 // NewAliyunService 使用wrie 要多包一层 或者变量用全局变量
-func NewAliyunService(accessID,
+func NewAliyunService(
+	accessID,
 	accessKeySecret,
 	regionId,
 	signName,
@@ -48,10 +49,11 @@ func NewAliyunService(accessID,
 
 // Send  短信发送
 // ArgVal 可以根据实际需求灵活变换数据结构
-func (s *Service) Send(ctx context.Context, phoneNumbers []string, args []sms.ArgVal) error {
+// tpl 是业务类型  aliyun 这里用不着
+func (s *Service) Send(ctx context.Context, tpl string, phoneNumbers []string, args []sms.ArgVal) error {
 	//TODO implement me
 	request := dysmsapi.CreateSendSmsRequest()
-
+	fmt.Println("alyun业务类型:", tpl)
 	request.Scheme = "https"
 	request.SignName = s.signName
 	request.TemplateCode = s.templateCode
@@ -62,13 +64,13 @@ func (s *Service) Send(ctx context.Context, phoneNumbers []string, args []sms.Ar
 	for _, arg := range args {
 		tmpMap[arg.Name] = arg.Val
 	}
+
 	//map  转json 字符串
 	byteCode, err := sonic.Marshal(tmpMap)
 	if err != nil {
 		return err
 	}
 	request.TemplateParam = string(byteCode)
-
 	response, err := s.client.SendSms(request)
 	if err != nil {
 		return err

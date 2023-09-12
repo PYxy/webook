@@ -1,0 +1,2 @@
+ mockgen -source=F:\git_push\webook\internal\service\sms\type.go  -package=limitmocks -destination=F:\git_push\webo
+ok\internal\service\sms\ratelimit\mocks\limit_mock.go
