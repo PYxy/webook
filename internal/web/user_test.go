@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -432,12 +434,13 @@ func TestUserHandler_SmsLogin(t *testing.T) {
 
 func TestUserHandler_LoginJWT(t *testing.T) {
 	testCases := []struct {
-		name     string
-		mock     func(ctl *gomock.Controller) (service.UserService, service.CodeService)
-		reqBody  string
-		wantCode int
-		wantBody string
-		userId   int64 // jwt-token 中携带的信息
+		name        string
+		mock        func(ctl *gomock.Controller) (service.UserService, service.CodeService)
+		reqBody     string
+		wantCode    int
+		wantBody    string
+		userId      int64 // jwt-token 中携带的信息
+		fingerprint string
 	}{
 		{
 			name: "邮箱或密码不对",
@@ -504,12 +507,9 @@ func TestUserHandler_LoginJWT(t *testing.T) {
 			req, err := http.NewRequest(http.MethodPost, "/users/loginJWT", bytes.NewBuffer([]byte(tc.reqBody)))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
-
 			//用于接收resp
 			resp := httptest.NewRecorder()
-
 			server.ServeHTTP(resp, req)
-
 			//获取响应头中的X-Jwt-Token 并解析
 			tocker := resp.Header().Get("X-Jwt-Token")
 			//t.Log(tocker)
@@ -530,4 +530,109 @@ func TestUserHandler_LoginJWT(t *testing.T) {
 			assert.Equal(t, tc.userId, claims.Uid)
 		})
 	}
+}
+
+func TestUserHandler_TokenLogin(t *testing.T) {
+	now := time.Now()
+	testCases := []struct {
+		name        string
+		mock        func(ctl *gomock.Controller) (service.UserService, service.CodeService)
+		reqBody     string
+		wantCode    int
+		wantBody    string
+		fingerprint string
+		//userId   int64 // jwt-token 中携带的信息
+	}{
+		{
+			name: "参数绑定失败",
+			mock: func(ctl *gomock.Controller) (service.UserService, service.CodeService) {
+				return nil, nil
+			},
+			reqBody:     `{"email":"asxxxxxxxxxx163.com","password":"123456","fingerprint":"for-test"}`,
+			wantCode:    http.StatusBadRequest,
+			wantBody:    "参数合法性验证失败",
+			fingerprint: "",
+		},
+		{
+			name: "登录成功",
+			mock: func(ctl *gomock.Controller) (service.UserService, service.CodeService) {
+				return nil, nil
+			},
+			reqBody:     `{"email":"asxxxxxxxxxx@163.com","password":"123456","fingerprint":"for-test"}`,
+			wantCode:    http.StatusOK,
+			wantBody:    "登陆成功",
+			fingerprint: "for-test",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			server := gin.New()
+			h := NewUserHandler(tc.mock(ctrl))
+			h.RegisterRoutes(server)
+
+			req, err := http.NewRequest(http.MethodPost, "/users/login_token", bytes.NewBuffer([]byte(tc.reqBody)))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			//用于接收resp
+			resp := httptest.NewRecorder()
+
+			server.ServeHTTP(resp, req)
+
+			assert.Equal(t, tc.wantCode, resp.Code)
+
+			assert.Equal(t, tc.wantBody, resp.Body.String())
+			//登录成功才需要判断
+			if resp.Code == http.StatusOK {
+				access_token := resp.Header().Get("x-access-token")
+				refresh_token := resp.Header().Get("x-refresh-token")
+
+				//解析jwtToken
+				accessTokenClaim, err := UnPackJWT(access_token)
+				if err != nil {
+					panic(err)
+				}
+				//在判断 前端传入的信息是否一致
+				assert.Equal(t, tc.fingerprint, accessTokenClaim.Fingerprint)
+				//判断过期时间
+				fmt.Println(now.Add(time.Minute * 29).UnixMilli())
+				fmt.Println(accessTokenClaim.RegisteredClaims.ExpiresAt.Time.UnixMilli())
+				if now.Add(time.Minute*29).UnixMilli() > accessTokenClaim.RegisteredClaims.ExpiresAt.Time.UnixMilli() {
+					panic("过期时间异常")
+					return
+				}
+
+				refreshTokenClaim, err := UnPackJWT(refresh_token)
+				if err != nil {
+					panic(err)
+				}
+				assert.Equal(t, tc.fingerprint, refreshTokenClaim.Fingerprint)
+				//判断过期时间
+				if now.Add(time.Hour*168).UnixMilli() > accessTokenClaim.RegisteredClaims.ExpiresAt.Time.UnixMilli() {
+					panic("过期时间异常")
+					return
+				}
+
+			}
+		})
+	}
+}
+
+func UnPackJWT(tokenStr string) (*TokenClaims, error) {
+	claims := &TokenClaims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+		//[]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0") 要给后面接口中的一致
+		return []byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if token == nil || !token.Valid {
+		//解析成功  但是 token 以及 claims 不一定合法
+		return nil, errors.New("不合法操作")
+	}
+	return claims, nil
 }

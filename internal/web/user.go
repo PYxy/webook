@@ -63,6 +63,77 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	//短信验证登录 并按实际情况注册
 	ug.POST("/login_sms/code/send", u.SmsSend)
 	ug.POST("/login_sms", u.SmsLogin)
+	//长短token
+	ug.POST("/login_token", u.TokenLogin)
+}
+
+func (u *UserHandler) TokenLogin(ctx *gin.Context) {
+
+	type TokenLoginReq struct {
+		Email       string `json:"email" binding:"required,email"`
+		Password    string `json:"password" binding:"required"`
+		Fingerprint string `json:"fingerprint" binding:"required"` //你可以认为这是一个前端采集了用户的登录环境生成的一个码，你编码进去 JWT acccess_token 中。
+	}
+	var req TokenLoginReq
+	err := ctx.ShouldBind(&req)
+	if err != nil {
+		//bing  有异常绑定处理  直接返回就行
+		fmt.Println(err.Error())
+		ctx.String(http.StatusBadRequest, "参数合法性验证失败")
+		return
+	}
+	//验证登录用户合法性 获取个人信息查找的标识: 例如id
+	err = u.setTokenJwt(ctx, req.Fingerprint)
+	if err != nil {
+		ctx.String(http.StatusInternalServerError, "系统异常")
+		return
+	}
+	ctx.String(http.StatusOK, "登陆成功")
+}
+
+func (u *UserHandler) setTokenJwt(ctx *gin.Context, fingerprint string) error {
+	/*
+		在登录成功的时候，返回两个 token，
+		一个 access_token，一个 refresh_token。
+		其中 access_token 被用来正常访问数据，
+		    refresh_token 用来刷新 token。
+		其中 access_token 被放到响应 header x-access-token 中，refresh token 被放到 x-refresh-token 中。
+	*/
+	now := time.Now()
+	claims := TokenClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(now.Add(time.Minute * 30)),
+		},
+		Fingerprint: fingerprint,
+	}
+	//access_token 被用来正常访问数据
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+
+	accessToken, err := token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
+	if err != nil {
+		return err
+	}
+	ctx.Header("x-access-token", accessToken)
+	//refresh_token 用来刷新 access_token。
+	//修改 refresh_token 的过期时间
+	claims.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(now.Add(time.Hour * 168))
+	token = jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	//下面的密钥可以使用不同的密钥(一样的也行)
+	refreshToken, err := token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
+	if err != nil {
+		//删除 access-token
+		ctx.Writer.Header().Del("x-access-token")
+		return err
+	}
+	//可以换一种方式保持到redis里面,避免refresh_token 被人拿到之后一直使用
+	//可以使用MD5 转一下,或者直接截取指定长度的字符串 如: 以key 为 前面获取到的字符串
+	ctx.Header("x-refresh-token", refreshToken)
+
+	return nil
+}
+
+func (u *UserHandler) TokenEdit(ctx *gin.Context) {
+	ctx.String(http.StatusOK, "允许操作")
 }
 
 func (u *UserHandler) SmsSend(ctx *gin.Context) {
@@ -464,6 +535,14 @@ type UserClaims struct {
 	Uid int64
 	// 自己随便加
 	UserAgent string
+}
+
+type TokenClaims struct {
+	jwt.RegisteredClaims
+	// 这是一个前端采集了用户的登录环境生成的一个码
+	Fingerprint string
+	//用于查找用户信息的一个字段
+	Id int64
 }
 
 type Result struct {
