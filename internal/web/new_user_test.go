@@ -44,10 +44,7 @@ func TestUserHandleV2_TokenLogin(t *testing.T) {
 			name: "系统异常",
 			mock: func(ctl *gomock.Controller) (service.UserService, service.CodeService, JWT) {
 				jwt1 := jwtmocks.NewMockJWT(ctl)
-				jwt1.EXPECT().Encryption(gomock.Any()).Return(
-					"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTQ1OTY3NzIsIkZp  bmdlcnByaW50IjoiZm9yLXRlc3QiLCJJZCI6MH0.ZuZVo4I9HyePuZbZfig4BCPUZgjjxFyTcIGVeUzAb5Gzs-iAJ_LXSq5DPe8c6WwLelLF-TW7GfWqAaKryyCp5A",
-					"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTUxOTk3NzIsIkZp  bmdlcnByaW50IjoiZm9yLXRlc3QiLCJJZCI6MH0.sCzJMLVwB8JLAKA1FMv8FU4EHq83RGB64O2u-rTgg6hKfuka9APZi_vKvVKji4kItC6i2pKt-6Ks17PfJxTH2A",
-					errors.New("系统异常"))
+				jwt1.EXPECT().Encryption(gomock.Any()).Return("", "", errors.New("系统异常"))
 				return nil, nil, jwt1
 			},
 			reqBody:     `{"email":"asxxxxxxxxxx@163.com","password":"123456","fingerprint":"for-test"}`,
@@ -59,9 +56,9 @@ func TestUserHandleV2_TokenLogin(t *testing.T) {
 			name: "登录成功",
 			mock: func(ctl *gomock.Controller) (service.UserService, service.CodeService, JWT) {
 				jwt1 := jwtmocks.NewMockJWT(ctl)
+				tokenStr, refreshToken := CreateToken()
 				jwt1.EXPECT().Encryption(gomock.Any()).Return(
-					"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTQ1OTY3NzIsIkZp  bmdlcnByaW50IjoiZm9yLXRlc3QiLCJJZCI6MH0.ZuZVo4I9HyePuZbZfig4BCPUZgjjxFyTcIGVeUzAb5Gzs-iAJ_LXSq5DPe8c6WwLelLF-TW7GfWqAaKryyCp5A",
-					"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTUxOTk3NzIsIkZp  bmdlcnByaW50IjoiZm9yLXRlc3QiLCJJZCI6MH0.sCzJMLVwB8JLAKA1FMv8FU4EHq83RGB64O2u-rTgg6hKfuka9APZi_vKvVKji4kItC6i2pKt-6Ks17PfJxTH2A",
+					tokenStr, refreshToken,
 					nil)
 				jwt1.EXPECT().Decrypt(gomock.Any()).Return(
 					&TokenClaims{
@@ -140,6 +137,24 @@ func TestUserHandleV2_TokenLogin(t *testing.T) {
 			}
 		})
 	}
+}
+
+func CreateToken() (string, string) {
+	now := time.Now()
+	claims := TokenClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(now.Add(time.Minute * 30)),
+		},
+		Fingerprint: "for-test",
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	tokenStr, _ := token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
+
+	claims.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(now.Add(time.Hour * 168))
+	token = jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	//下面的密钥可以使用不同的密钥(一样的也行)
+	refreshToken, _ := token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
+	return tokenStr, refreshToken
 }
 
 func TestJWT(t *testing.T) {

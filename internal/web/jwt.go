@@ -56,7 +56,8 @@ func (j *Jwt) Decrypt(tokenStr string) (interface{}, error) {
 	claims := &TokenClaims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 		//[]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0") 要给后面接口中的一致
-		return []byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"), nil
+		//95osj3fUD7fo0mlYdDbncXz4VD2igvf0"
+		return []byte(j.secretCode), nil
 	})
 	if err != nil {
 		return nil, err
