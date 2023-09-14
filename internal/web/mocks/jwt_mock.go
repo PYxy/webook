@@ -6,60 +6,60 @@ package jwtmocks
 
 import (
 	reflect "reflect"
+	time "time"
 
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockJWT is a mock of JWT interface.
-type MockJWT struct {
+// MockEncryptionHandle is a mock of EncryptionHandle interface.
+type MockEncryptionHandle struct {
 	ctrl     *gomock.Controller
-	recorder *MockJWTMockRecorder
+	recorder *MockEncryptionHandleMockRecorder
 }
 
-// MockJWTMockRecorder is the mock recorder for MockJWT.
-type MockJWTMockRecorder struct {
-	mock *MockJWT
+// MockEncryptionHandleMockRecorder is the mock recorder for MockEncryptionHandle.
+type MockEncryptionHandleMockRecorder struct {
+	mock *MockEncryptionHandle
 }
 
-// NewMockJWT creates a new mock instance.
-func NewMockJWT(ctrl *gomock.Controller) *MockJWT {
-	mock := &MockJWT{ctrl: ctrl}
-	mock.recorder = &MockJWTMockRecorder{mock}
+// NewMockEncryptionHandle creates a new mock instance.
+func NewMockEncryptionHandle(ctrl *gomock.Controller) *MockEncryptionHandle {
+	mock := &MockEncryptionHandle{ctrl: ctrl}
+	mock.recorder = &MockEncryptionHandleMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockJWT) EXPECT() *MockJWTMockRecorder {
+func (m *MockEncryptionHandle) EXPECT() *MockEncryptionHandleMockRecorder {
 	return m.recorder
 }
 
 // Decrypt mocks base method.
-func (m *MockJWT) Decrypt(tokenStr string) (interface{}, error) {
+func (m *MockEncryptionHandle) Decrypt(tokenStr, secretCode string) (interface{}, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Decrypt", tokenStr)
+	ret := m.ctrl.Call(m, "Decrypt", tokenStr, secretCode)
 	ret0, _ := ret[0].(interface{})
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Decrypt indicates an expected call of Decrypt.
-func (mr *MockJWTMockRecorder) Decrypt(tokenStr interface{}) *gomock.Call {
+func (mr *MockEncryptionHandleMockRecorder) Decrypt(tokenStr, secretCode interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Decrypt", reflect.TypeOf((*MockJWT)(nil).Decrypt), tokenStr)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Decrypt", reflect.TypeOf((*MockEncryptionHandle)(nil).Decrypt), tokenStr, secretCode)
 }
 
 // Encryption mocks base method.
-func (m *MockJWT) Encryption(arg0 map[string]string) (string, string, error) {
+func (m *MockEncryptionHandle) Encryption(arg0 map[string]string, arg1 string, arg2 time.Duration) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Encryption", arg0)
+	ret := m.ctrl.Call(m, "Encryption", arg0, arg1, arg2)
 	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(string)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Encryption indicates an expected call of Encryption.
-func (mr *MockJWTMockRecorder) Encryption(arg0 interface{}) *gomock.Call {
+func (mr *MockEncryptionHandleMockRecorder) Encryption(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Encryption", reflect.TypeOf((*MockJWT)(nil).Encryption), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Encryption", reflect.TypeOf((*MockEncryptionHandle)(nil).Encryption), arg0, arg1, arg2)
 }

@@ -23,7 +23,7 @@ func TestUserHandleV2_TokenLogin(t *testing.T) {
 	now := time.Now()
 	testCases := []struct {
 		name        string
-		mock        func(ctl *gomock.Controller) (service.UserService, service.CodeService, JWT)
+		mock        func(ctl *gomock.Controller) (service.UserService, service.CodeService, EncryptionHandle)
 		reqBody     string
 		wantCode    int
 		wantBody    string
@@ -32,7 +32,7 @@ func TestUserHandleV2_TokenLogin(t *testing.T) {
 	}{
 		{
 			name: "参数绑定失败",
-			mock: func(ctl *gomock.Controller) (service.UserService, service.CodeService, JWT) {
+			mock: func(ctl *gomock.Controller) (service.UserService, service.CodeService, EncryptionHandle) {
 				return nil, nil, nil
 			},
 			reqBody:     `{"email":"asxxxxxxxxxx163.com","password":"123456","fingerprint":"for-test"}`,
@@ -42,9 +42,9 @@ func TestUserHandleV2_TokenLogin(t *testing.T) {
 		},
 		{
 			name: "系统异常",
-			mock: func(ctl *gomock.Controller) (service.UserService, service.CodeService, JWT) {
-				jwt1 := jwtmocks.NewMockJWT(ctl)
-				jwt1.EXPECT().Encryption(gomock.Any()).Return("", "", errors.New("系统异常"))
+			mock: func(ctl *gomock.Controller) (service.UserService, service.CodeService, EncryptionHandle) {
+				jwt1 := jwtmocks.NewMockEncryptionHandle(ctl)
+				jwt1.EXPECT().Encryption(gomock.Any(), gomock.Any(), gomock.Any()).Return("", errors.New("系统异常"))
 				return nil, nil, jwt1
 			},
 			reqBody:     `{"email":"asxxxxxxxxxx@163.com","password":"123456","fingerprint":"for-test"}`,
@@ -54,13 +54,14 @@ func TestUserHandleV2_TokenLogin(t *testing.T) {
 		},
 		{
 			name: "登录成功",
-			mock: func(ctl *gomock.Controller) (service.UserService, service.CodeService, JWT) {
-				jwt1 := jwtmocks.NewMockJWT(ctl)
+			mock: func(ctl *gomock.Controller) (service.UserService, service.CodeService, EncryptionHandle) {
+				jwt1 := jwtmocks.NewMockEncryptionHandle(ctl)
 				tokenStr, refreshToken := CreateToken()
-				jwt1.EXPECT().Encryption(gomock.Any()).Return(
-					tokenStr, refreshToken,
-					nil)
-				jwt1.EXPECT().Decrypt(gomock.Any()).Return(
+				jwt1.EXPECT().Encryption(gomock.Any(), AccessSecret, time.Minute*30).Return(
+					tokenStr, nil)
+				jwt1.EXPECT().Encryption(gomock.Any(), RefreshSecret, time.Hour*24*7).Return(
+					refreshToken, nil)
+				jwt1.EXPECT().Decrypt(gomock.Any(), AccessSecret).Return(
 					&TokenClaims{
 						RegisteredClaims: jwt.RegisteredClaims{
 							ExpiresAt: jwt.NewNumericDate(now.Add(time.Minute * 30)),
@@ -68,10 +69,10 @@ func TestUserHandleV2_TokenLogin(t *testing.T) {
 						Fingerprint: "for-test",
 					}, nil,
 				)
-				jwt1.EXPECT().Decrypt(gomock.Any()).Return(
+				jwt1.EXPECT().Decrypt(gomock.Any(), RefreshSecret).Return(
 					&TokenClaims{
 						RegisteredClaims: jwt.RegisteredClaims{
-							ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour * 168)),
+							ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour * 24 * 7)),
 						},
 						Fingerprint: "for-test",
 					}, nil,
@@ -109,21 +110,19 @@ func TestUserHandleV2_TokenLogin(t *testing.T) {
 			if resp.Code == http.StatusOK {
 				accessToken := resp.Header().Get("x-access-token")
 				refreshToken := resp.Header().Get("x-refresh-token")
-				acessT, err := h.Jwt.Decrypt(accessToken)
+				acessT, err := h.Jwt.Decrypt(accessToken, AccessSecret)
 				if err != nil {
 					panic(err)
 				}
 				accessTokenClaim := acessT.(*TokenClaims)
 				assert.Equal(t, tc.fingerprint, accessTokenClaim.Fingerprint)
 				//判断过期时间
-				fmt.Println(now.Add(time.Minute * 29).UnixMilli())
-				fmt.Println(accessTokenClaim.RegisteredClaims.ExpiresAt.Time.UnixMilli())
 				if now.Add(time.Minute*29).UnixMilli() > accessTokenClaim.RegisteredClaims.ExpiresAt.Time.UnixMilli() {
 					panic("过期时间异常")
 					return
 				}
 
-				refreshT, err := h.Jwt.Decrypt(refreshToken)
+				refreshT, err := h.Jwt.Decrypt(refreshToken, RefreshSecret)
 				if err != nil {
 					panic(err)
 				}
@@ -148,12 +147,12 @@ func CreateToken() (string, string) {
 		Fingerprint: "for-test",
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
-	tokenStr, _ := token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
+	tokenStr, _ := token.SignedString([]byte(AccessSecret))
 
 	claims.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(now.Add(time.Hour * 168))
 	token = jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	//下面的密钥可以使用不同的密钥(一样的也行)
-	refreshToken, _ := token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
+	refreshToken, _ := token.SignedString([]byte(RefreshSecret))
 	return tokenStr, refreshToken
 }
 
@@ -166,7 +165,7 @@ func TestJWT(t *testing.T) {
 		Fingerprint: "for-test",
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
-	tokenStr, err := token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
+	tokenStr, err := token.SignedString([]byte(AccessSecret))
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -174,7 +173,7 @@ func TestJWT(t *testing.T) {
 	claims.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(now.Add(time.Hour * 168))
 	token = jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	//下面的密钥可以使用不同的密钥(一样的也行)
-	refreshToken, err := token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
+	refreshToken, err := token.SignedString([]byte(RefreshSecret))
 	if err != nil {
 		//删除 access-token
 		fmt.Println(err)

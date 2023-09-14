@@ -72,7 +72,7 @@ func (u *UserHandler) TokenLogin(ctx *gin.Context) {
 	type TokenLoginReq struct {
 		Email       string `json:"email" binding:"required,email"`
 		Password    string `json:"password" binding:"required"`
-		Fingerprint string `json:"fingerprint" binding:"required"` //你可以认为这是一个前端采集了用户的登录环境生成的一个码，你编码进去 JWT acccess_token 中。
+		Fingerprint string `json:"fingerprint" binding:"required"` //你可以认为这是一个前端采集了用户的登录环境生成的一个码，你编码进去 EncryptionHandle acccess_token 中。
 	}
 	var req TokenLoginReq
 	err := ctx.ShouldBind(&req)
@@ -424,7 +424,7 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 	//旧版本 的获取userId
 	//val, _ := ctx.Get("userId")
 
-	//JWT
+	//EncryptionHandle
 	val, _ := ctx.Get("claims")
 	claim, _ := val.(*UserClaims)
 	if err = u.svc.Edit(ctx, domain.User{
