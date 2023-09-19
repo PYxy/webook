@@ -54,6 +54,11 @@ func (s *service) AuthURL(ctx context.Context, state string) (string, error) {
 
 // VerifyCode 根据获取到的 临时授权码 再去请求微信拿到详细信息
 func (s *service) VerifyCode(ctx context.Context, code string) (domain.WechatInfo, error) {
+	// 攻击者的 state
+	//str := s.cmd.Get(ctx, "my-state"+state).String()
+	//if str != state {
+	//	// 不相等
+	//}
 	const targetPattern = "https://api.weixin.qq.com/sns/oauth2/access_token?appid=%s&secret=%s&code=%s&grant_type=authorization_code"
 	target := fmt.Sprintf(targetPattern, s.appId, s.appSecret, code)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
@@ -84,12 +89,6 @@ func (s *service) VerifyCode(ctx context.Context, code string) (domain.WechatInf
 		return domain.WechatInfo{},
 			fmt.Errorf("微信返回错误响应，错误码：%d，错误信息：%s", res.ErrCode, res.ErrMsg)
 	}
-
-	// 攻击者的 state
-	//str := s.cmd.Get(ctx, "my-state"+state).String()
-	//if str != state {
-	//	// 不相等
-	//}
 
 	return domain.WechatInfo{
 		OpenID:  res.OpenID,

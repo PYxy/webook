@@ -13,6 +13,7 @@ import (
 	"gitee.com/geekbang/basic-go/webook/internal/service"
 	sla "gitee.com/geekbang/basic-go/webook/internal/service/sms/local"
 	"gitee.com/geekbang/basic-go/webook/internal/web"
+	mJwt "gitee.com/geekbang/basic-go/webook/internal/web/jwt"
 	"gitee.com/geekbang/basic-go/webook/ioc"
 )
 
@@ -22,7 +23,8 @@ func InitWebServer() *gin.Engine {
 		//数据库连接初始化
 		//TODO  base
 		ioc.InitMysql,
-		//ioc.InitRedis,
+		//initDB,
+		ioc.InitRedis,
 		//redis 中间件
 		ioc.InitRedisStore,
 
@@ -53,6 +55,8 @@ func InitWebServer() *gin.Engine {
 
 		//TODO User server
 		service.NewUserService,
+
+		mJwt.NewRedisJWTHandler,
 
 		//使用NewCodeService  NewUserService
 		web.NewUserHandler,

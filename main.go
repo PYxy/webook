@@ -22,6 +22,7 @@ import (
 	"gitee.com/geekbang/basic-go/webook/internal/service"
 	"gitee.com/geekbang/basic-go/webook/internal/service/sms/aliyun"
 	"gitee.com/geekbang/basic-go/webook/internal/web"
+	"gitee.com/geekbang/basic-go/webook/internal/web/jwt"
 	"gitee.com/geekbang/basic-go/webook/internal/web/middleware"
 )
 
@@ -37,9 +38,10 @@ func main() {
 	//TODO 数据库连接对象初始化
 	db, cache := initDB()
 	//gin 服务初始化
-	server := initWebServer()
+	jwtHandler := jwt.NewRedisJWTHandler(cache)
+	server := initWebServer(jwtHandler)
 	// 初始化 UserHandle
-	u := initUser(db, cache)
+	u := initUser(db, cache, jwtHandler)
 
 	//路由注册
 	u.RegisterRoutes(server)
@@ -53,7 +55,7 @@ func main() {
 //	engine.Run(":8787")
 //}
 
-func initWebServer() *gin.Engine {
+func initWebServer(jwtHandler jwt.Handler) *gin.Engine {
 	server := gin.Default()
 
 	//TODO 中间件注册
@@ -69,7 +71,7 @@ func initWebServer() *gin.Engine {
 		//AllowOrigins: []string{"*"},
 		//AllowMethods: []string{"POST", "GET"},
 		AllowHeaders:  []string{"Content-Type", "Authorization"},
-		ExposeHeaders: []string{"x-jwt-token"},
+		ExposeHeaders: []string{"x-jwt-token", "jwt-state", "x-refresh-token"},
 		// 是否允许你带 cookie 之类的东西
 		AllowCredentials: true,
 		AllowOriginFunc: func(origin string) bool {
@@ -102,10 +104,14 @@ func initWebServer() *gin.Engine {
 	//	IgnorePaths("/users/signup").
 	//	IgnorePaths("/users/login").Build())
 	//TODO  这是使用JWT  进行登录验证
-	server.Use(middleware.NewLoginJWTMiddlewareBuilder().
+
+	server.Use(middleware.NewLoginJWTMiddlewareBuilder(jwtHandler).
 		IgnorePaths("/users/signup").
-		IgnorePaths("/users/login_sms/code/send").IgnorePaths("/users/login_sms").
-		IgnorePaths("/users/loginJWT").Build())
+		IgnorePaths("/users/login_sms/code/send").
+		IgnorePaths("/users/login_sms").
+		IgnorePaths("/users/loginJWT").
+		IgnorePaths("/oauth2/wechat/authurl").IgnorePaths("/oauth2/wechat/callback").
+		IgnorePaths("/users/refresh_token").Build())
 	// v1
 	//middleware.IgnorePaths = []string{"sss"}
 	//server.Use(middleware.CheckLogin())
@@ -116,7 +122,7 @@ func initWebServer() *gin.Engine {
 	return server
 }
 
-func initUser(db *gorm.DB, cache v9.Cmdable) *web.UserHandler {
+func initUser(db *gorm.DB, cache v9.Cmdable, jwtHandler jwt.Handler) *web.UserHandler {
 
 	//user svc 构建
 	ud := dao.NewUserDAO(db)
@@ -152,7 +158,7 @@ func initUser(db *gorm.DB, cache v9.Cmdable) *web.UserHandler {
 	//使用阿里云 发送短信
 	//codeSvc := service.NewCodeService(alSms, codeRepo)
 
-	u := web.NewUserHandler(svc, codeSvc)
+	u := web.NewUserHandler(svc, codeSvc, jwtHandler)
 	return u
 }
 

@@ -3,7 +3,6 @@
 //go:generate go run github.com/google/wire/cmd/wire
 //+build !wireinject
 
-
 package main
 
 import (
@@ -13,6 +12,7 @@ import (
 	"gitee.com/geekbang/basic-go/webook/internal/service"
 	local2 "gitee.com/geekbang/basic-go/webook/internal/service/sms/local"
 	"gitee.com/geekbang/basic-go/webook/internal/web"
+	"gitee.com/geekbang/basic-go/webook/internal/web/jwt"
 	"gitee.com/geekbang/basic-go/webook/ioc"
 	"github.com/gin-gonic/gin"
 )
@@ -21,7 +21,9 @@ import (
 
 func InitWebServer() *gin.Engine {
 	store := ioc.InitRedisStore()
-	v := ioc.InitMiddleWare(store)
+	cmdable := ioc.InitRedis()
+	handler := jwt.NewRedisJWTHandler(cmdable)
+	v := ioc.InitMiddleWare(store, handler)
 	db := ioc.InitMysql()
 	userDaoInterface := dao.NewUserDAO(db)
 	userCache := local.NewUserCache()
@@ -31,7 +33,7 @@ func InitWebServer() *gin.Engine {
 	smsCache := local.NewLocalSmsCache()
 	codeRepository := repository.NewCodeRepository(smsCache)
 	codeService := service.NewCodeService(smsService, codeRepository)
-	userHandler := web.NewUserHandler(userService, codeService)
+	userHandler := web.NewUserHandler(userService, codeService, handler)
 	engine := ioc.InitWeb(v, userHandler)
 	return engine
 }

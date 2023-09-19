@@ -12,6 +12,7 @@ import (
 
 	"gitee.com/geekbang/basic-go/webook/config"
 	"gitee.com/geekbang/basic-go/webook/internal/web"
+	"gitee.com/geekbang/basic-go/webook/internal/web/jwt"
 	"gitee.com/geekbang/basic-go/webook/internal/web/middleware"
 )
 
@@ -27,7 +28,7 @@ func InitWeb(middleWare []gin.HandlerFunc, handler *web.UserHandler) *gin.Engine
 }
 
 // InitMiddleWare 中间件
-func InitMiddleWare(store redis.Store) []gin.HandlerFunc {
+func InitMiddleWare(store redis.Store, handler jwt.Handler) []gin.HandlerFunc {
 
 	tmpMiddle := make([]gin.HandlerFunc, 0, 10)
 
@@ -63,10 +64,13 @@ func InitMiddleWare(store redis.Store) []gin.HandlerFunc {
 	tmpMiddle = append(tmpMiddle, sessions.Sessions("mysession", store))
 
 	//jwt Token 或者 session  需要过滤的url
-	tmpMiddle = append(tmpMiddle, middleware.NewLoginJWTMiddlewareBuilder().
+	tmpMiddle = append(tmpMiddle, middleware.NewLoginJWTMiddlewareBuilder(handler).
 		IgnorePaths("/users/signup").
-		IgnorePaths("/users/login_sms/code/send").IgnorePaths("/users/login_sms").
-		IgnorePaths("/users/loginJWT").Build())
+		IgnorePaths("/users/login_sms/code/send").
+		IgnorePaths("/users/login_sms").
+		IgnorePaths("/users/loginJWT").
+		IgnorePaths("/oauth2/wechat/authurl").IgnorePaths("/oauth2/wechat/callback").
+		IgnorePaths("/users/refresh_token").Build())
 
 	return tmpMiddle
 

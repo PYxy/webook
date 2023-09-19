@@ -3,6 +3,7 @@ package retryable
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 
 	"gitee.com/geekbang/basic-go/webook/internal/service/sms"
 )
@@ -21,7 +22,7 @@ func NewService(svc sms.Service, retryMax int) sms.Service {
 	}
 }
 
-func (s Service) Send(ctx context.Context, tpl string, numbers []string, args []sms.ArgVal) error {
+func (s *Service) Send(ctx context.Context, tpl string, numbers []string, args []sms.ArgVal) error {
 	err := s.svc.Send(ctx, tpl, numbers, args)
 	cnt := 1
 	for err != nil && cnt < s.retryMax {
@@ -32,6 +33,23 @@ func (s Service) Send(ctx context.Context, tpl string, numbers []string, args []
 		cnt++
 	}
 	return errors.New("重试都失败了")
+}
+
+type RetryService struct {
+	svcs   []sms.Service
+	state  atomic.Uint32
+	length int
+}
+
+func (r *RetryService) Send(ctx context.Context, biz string, phoneNumbers []string, args []sms.ArgVal) error {
+	////TODO implement me
+
+	//第一时间检查是不是有可用服务
+	if r.length <= 0 {
+		return errors.New("不存在可用的服务")
+	}
+
+	return nil
 }
 
 // 设计并实现了一个高可用的短信平台

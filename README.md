@@ -191,3 +191,38 @@ go test -run="TestUserHandler_LoginJWT" -v
 go test -v
 
 ```
+
+
+修改Jwt 登录设置成长短token+JWT
+```bash
+测试流程:
+1.注册
+http://127.0.0.1:8091/users/signup post 请求
+{"email":"asxxxxxxxxxx@163.com","confirmPassword":"xxxx@1xxxxxxxxx","password":"xxxx@1xxxxxxxxx"} json格式
+
+2.登录
+http://127.0.0.1:8091/users/loginJWT post 请求
+{"email":"asxxxxxxxxxx@163.com","password":"xxxx@1xxxxxxxxx"} json格式
+查看 resp Headers
+X-Jwt-Token      eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTUxMDkwMTUsIlVpZCI6MiwiU3NpZCI6IjVhZTlmZDlhLWY1MDEtNDMyZC05OTA3LTZiMDY2ZTc3ZDA2MCIsIlVzZXJBZ2VudCI6IlBvc3RtYW5SdW50aW1lLzcuMjYuOCJ9.BY8cL8iac8pRvAjAl-v-aonlZyPJU0QTjc5AnAE8E9c6guK7SX8tb7eOnytU5Lb2_G3xBMccJ8m7J9tld7KVeg
+X-Refresh-Token  eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTU3MTIwMTUsIlVpZCI6MiwiU3NpZCI6IjVhZTlmZDlhLWY1MDEtNDMyZC05OTA3LTZiMDY2ZTc3ZDA2MCJ9.BVts4bsP-2DZEgGGhXpCOAKVHCQyE6FZI1vG17gyvXrRXNaBD5KJPy1U_EaXNH4UJLDM8Sv7VlUTX9V2J36XNQ
+
+3.更新access_token
+http://127.0.0.1:8091/users/refresh_token post 请求
+req Headers 带参数   
+              X-Refresh-Token
+Authorization bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTU3MTIzMTksIlVpZCI6MiwiU3NpZCI6IjY0Nzc0MTlhLTQ4MzItNGU5MC1hN2ZhLWI5Y2MwNzZjYTkxMiJ9.jGVEMTGd9Nyl2E9zjzcGo7vXX0vxDCxQUBXpqn0O5442rNaUd0Jmw_GLZCryUTpjt81VJjqVG4ETnWdIYNFcHA
+
+重新获取搞 access_token
+eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTUxMDkzMjksIlVpZCI6MiwiU3NpZCI6IjY0Nzc0MTlhLTQ4MzItNGU5MC1hN2ZhLWI5Y2MwNzZjYTkxMiIsIlVzZXJBZ2VudCI6IlBvc3RtYW5SdW50aW1lLzcuMjYuOCJ9.wkIbLPqnvbJ1OlK8jOwWB5hLUq6RWdgmZxnxXXVi1cYt7gSzz_Y8o-WEYdQ2ILp1pW5eem3YPibNC24BOki_ew
+
+4.退出
+http://127.0.0.1:8091/users/logoutJWT post 请求
+req Headers 带参数  这个是access_token (如果带access_token  “提示未登录”，应该使用refresh token 请求 refresh_token接口)
+Authorization bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTUxMDkzMjksIlVpZCI6MiwiU3NpZCI6IjY0Nzc0MTlhLTQ4MzItNGU5MC1hN2ZhLWI5Y2MwNzZjYTkxMiIsIlVzZXJBZ2VudCI6IlBvc3RtYW5SdW50aW1lLzcuMjYuOCJ9.wkIbLPqnvbJ1OlK8jOwWB5hLUq6RWdgmZxnxXXVi1cYt7gSzz_Y8o-WEYdQ2ILp1pW5eem3YPibNC24BOki_ew
+
+
+5.使用原来的refresh token 去更新access token
+
+
+```

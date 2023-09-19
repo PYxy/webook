@@ -32,6 +32,11 @@ func NewUserDAO(db *gorm.DB) UserDaoInterface {
 //	return u, err
 //}
 
+func (dao *UserDAO) FindByWeChat(ctx context.Context, openId string) (u User, err error) {
+	err = dao.db.WithContext(ctx).Where("wechat_open_id = ?", openId).First(&u).Error
+	return u, err
+}
+
 func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
 	var u User
 	err := dao.db.WithContext(ctx).Where("email = ?", email).First(&u).Error
@@ -100,6 +105,12 @@ type User struct {
 	// 更新时间，毫秒数
 	Utime int64
 
+	//其实现在有优化 只要用到覆盖索引 都有机会使用联合索引或者普通的二级索引
+	// 如果要创建联合索引，<unionid, openid>，用 openid 查询的时候不会走索引
+	// <openid, unionid> 用 unionid 查询的时候，不会走索引
+	// 微信的字段
+	WechatUnionID sql.NullString
+	WechatOpenID  sql.NullString `gorm:"unique"`
 	//昵称
 	NickName string
 	//生日
