@@ -5,10 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
-
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
+	"time"
 )
 
 var (
@@ -16,14 +15,37 @@ var (
 	ErrUserNotFound  = gorm.ErrRecordNotFound
 )
 
+type DBProvider func() *gorm.DB
+
 type UserDAO struct {
 	db *gorm.DB
+
+	//动态监控配置文件的变更
+	p DBProvider
+}
+
+func NewUserDAOv1(p DBProvider) UserDaoInterface {
+	//法1
+	return &UserDAO{
+		p: p,
+	}
+	
 }
 
 func NewUserDAO(db *gorm.DB) UserDaoInterface {
+	//法1
 	return &UserDAO{
 		db: db,
 	}
+
+	//法2 动态获取db 配置
+	//res := &UserDAO{db: db}
+	//viper.OnConfigChange(func(in fsnotify.Event) {
+	//	db, err := gorm.Open(mysql.Open())
+	//	pt := unsafe.Pointer(&res.db)
+	//	atomic.StorePointer(&pt, unsafe.Pointer(&db))
+	//})
+	//return res
 }
 
 //func (dao *UserDAO) FindById(ctx context.Context, id int64) (User, error) {
@@ -33,6 +55,9 @@ func NewUserDAO(db *gorm.DB) UserDaoInterface {
 //}
 
 func (dao *UserDAO) FindByWeChat(ctx context.Context, openId string) (u User, err error) {
+	////动态监控配置文件的变更
+	//err = dao.p().WithContext(ctx).Where("wechat_open_id = ?", openId).First(&u).Error
+
 	err = dao.db.WithContext(ctx).Where("wechat_open_id = ?", openId).First(&u).Error
 	return u, err
 }

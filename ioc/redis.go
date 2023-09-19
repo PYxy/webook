@@ -2,6 +2,8 @@ package ioc
 
 import (
 	"context"
+	"fmt"
+	"github.com/spf13/viper"
 	"time"
 
 	v9 "github.com/redis/go-redis/v9"
@@ -10,6 +12,8 @@ import (
 )
 
 func InitRedis() v9.Cmdable {
+	dsn := viper.GetString("redis.dsn")
+	fmt.Println(dsn)
 	cache := v9.NewClient(&v9.Options{
 		Addr:     config.Config.Redis.Addr,
 		Password: "", // no password set

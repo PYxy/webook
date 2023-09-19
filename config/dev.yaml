@@ -1,0 +1,16 @@
+db.mysql:
+  dsn: "root:root@tcp(webook-mysql-service:3308)/webook"
+
+redis:
+  dsn: "webook-redis-service:6380"
+
+
+
+
+#  使用etcd 最好使用这种
+
+mysql:
+  dsn: "root:root@tcp(webook-mysql-service:3308)/webook"
+
+redis1:
+  dsn: "webook-redis-service:6380"

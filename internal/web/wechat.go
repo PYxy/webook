@@ -3,6 +3,8 @@ package web
 import (
 	"errors"
 	"fmt"
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/viper"
 	"net/http"
 	"time"
 
@@ -13,7 +15,13 @@ import (
 	"gitee.com/geekbang/basic-go/webook/internal/service"
 	"gitee.com/geekbang/basic-go/webook/internal/service/oauth2/wechat"
 	mJwt "gitee.com/geekbang/basic-go/webook/internal/web/jwt"
+
+	"go.uber.org/atomic"
 )
+
+var stateKey atomic.String = atomic.String{}
+
+//"95osj6fUD7foxmlYdDbncXz4VD2igvf1"
 
 //微信认证流程
 //1.请求服务的登录界面,选择微信登录
@@ -64,9 +72,16 @@ type WechatHandlerConfig struct {
 }
 
 func NewOAuth2WechatHandler(svc wechat.Service, jwtHandle mJwt.Handler, cfg WechatHandlerConfig) *OAuth2WechatHandler {
+	//stateKey 动态变法更配置的例子
+	//
+	stateKey.Store("123")
+	viper.OnConfigChange(func(in fsnotify.Event) {
+		stateKey.Store(viper.GetString("wechat.stateKey"))
+	})
 	return &OAuth2WechatHandler{
-		svc:      svc,
-		stateKey: []byte("95osj6fUD7foxmlYdDbncXz4VD2igvf1"),
+		svc: svc,
+		//stateKey: []byte(stateKey),
+		stateKey: []byte(stateKey.Load()),
 		cfg:      cfg,
 		Handler:  jwtHandle,
 	}
@@ -111,7 +126,9 @@ func (h *OAuth2WechatHandler) setStateCookie(ctx *gin.Context, state string) err
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 10)),
 		},
 	})
-	tokenStr, err := token.SignedString(h.stateKey)
+	//tokenStr, err := token.SignedString(h.stateKey)
+	tokenStr, err := token.SignedString(stateKey.Load())
+
 	if err != nil {
 		return err
 	}

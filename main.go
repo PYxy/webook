@@ -1,8 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"gitee.com/geekbang/basic-go/webook/ioc"
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/pflag"
+	_ "github.com/spf13/remote"
+	"github.com/spf13/viper"
 	"strings"
 	"time"
 
@@ -34,7 +40,7 @@ PS F:\git_push\webook>  go build -ldflags '-s -w' -o t99 .\main.go
 
 */
 
-func main() {
+func main3() {
 	//TODO 数据库连接对象初始化
 	db, cache := initDB()
 	//gin 服务初始化
@@ -54,6 +60,14 @@ func main() {
 //	engine := InitWebServer()
 //	engine.Run(":8787")
 //}
+
+// viper 测试
+func main() {
+	//initViper()
+	initViperV1()
+	//initViperV3()
+	ioc.InitMysql()
+}
 
 func initWebServer(jwtHandler jwt.Handler) *gin.Engine {
 	server := gin.Default()
@@ -186,4 +200,122 @@ func initDB() (*gorm.DB, v9.Cmdable) {
 		panic("redis  连接失败")
 	}
 	return db, cache
+}
+
+func initViperV3() {
+	//TODO  启动命令
+	//启动命令 go run .\main.go --config=./config/dev.yaml
+	//默认值
+	cfile := pflag.String("config", "./config/dev.yaml", "指定配置文件的路径")
+	pflag.Parse()
+
+	viper.SetConfigFile(*cfile)
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func initViperReader() {
+	viper.SetConfigType("yaml")
+	cfg := `
+db.mysql:
+  dsn: "root:root@tcp(webook-mysql-service:3308)/webook"
+
+redis:
+  dsn: "webook-redis-service:6380"
+`
+	err := viper.ReadConfig(bytes.NewReader([]byte(cfg)))
+	if err != nil {
+		panic(err)
+	}
+}
+
+func initViperV1() {
+	viper.SetConfigFile("./config/dev.yaml")
+	//这里可以设置默认值
+	//viper.SetDefault("db.mysql.dsn","root:root@tcp(webook-mysql-service:3308)/webook")
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func initViper() {
+	//配置文件的名字,但是不包含文件见扩展名
+	viper.SetConfigName("dev")
+	//配置文件的格式
+	viper.SetConfigType("yaml")
+	//当前文件的起点
+	viper.AddConfigPath("./config")
+	//可加多个
+	//viper.AddConfigPath("")
+	//viper.AddConfigPath("")
+
+	//加载再内存里面(全局的)
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	//可以生成一个新的viper 读取其他配置文件 然后把这个viper对象传给其他函数
+	//otherViper := viper.New()
+	//otherViper.SetConfigName("dev")
+	////配置文件的格式
+	//otherViper.SetConfigType("yaml")
+	////当前文件的起点 可加多个
+	//otherViper.AddConfigPath("./config")
+	//otherViper.ReadInConfig()
+}
+
+// viper 连接etcd
+func initViperRemote() {
+	//endpoint 是集群的话 127.0.0.1:2379,127.0.0.3:2379,127.0.0.2:2379
+	viper.SetConfigType("yaml")
+	err := viper.AddRemoteProvider("etcd3", "127.0.0.1:2379", "/weebk")
+	if err != nil {
+		panic(err)
+	}
+
+	//Remote 是没有 OnConfigChange的使用了 即使用来也是没有反应的
+	viper.OnConfigChange(func(in fsnotify.Event) {
+		//只能知道变化了 但是 不知道那个数据发生变化了,只能重新读一次对应使用的配置
+		//如
+		//viper.GetString("mysql.dsn")
+		fmt.Println(in.Name, in.Op)
+	})
+
+	err = viper.ReadRemoteConfig()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(viper.AllKeys())
+	fmt.Println(viper.AllSettings())
+	//写到etcd 中
+	//etcdctl --endpoints=127.0.0.1:2379 put /webook "$(<dev.yaml)"
+}
+
+// 监听配置文件变跟
+func initViperWatchV1() {
+	//TODO  启动命令
+	//启动命令 go run .\main.go --config=./config/dev.yaml
+	//默认值
+	cfile := pflag.String("config", "./config/dev.yaml", "指定配置文件的路径")
+	pflag.Parse()
+
+	viper.SetConfigFile(*cfile)
+	viper.WatchConfig()
+	//开启之后 修改物理配置文件
+	viper.OnConfigChange(func(in fsnotify.Event) {
+		//只能知道变化了 但是 不知道那个数据发生变化了,只能重新读一次对应使用的配置
+		//如
+		//viper.GetString("mysql.dsn")
+		fmt.Println(in.Name, in.Op)
+	})
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(err)
+	}
 }
