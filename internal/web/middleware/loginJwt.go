@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/redis/go-redis/v9"
 
 	mJwt "gitee.com/geekbang/basic-go/webook/internal/web/jwt"
 )
@@ -115,13 +114,7 @@ func (l *LoginJWTMiddlewareBuilder) Build() gin.HandlerFunc {
 		//}
 		fmt.Printf("检查claims: %#v \n", claims)
 		err = l.CheckSession(ctx, claims.Ssid)
-		if err == nil {
-			//2.退出登录了
-			ctx.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-		//如果不等于nil
-		if err != nil && err != redis.Nil {
+		if err != nil {
 			//redis 异常
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return

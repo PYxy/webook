@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/redis/go-redis/v9"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
 	"gitee.com/geekbang/basic-go/webook/internal/service"
@@ -578,13 +577,8 @@ func (u *UserHandler) RefreshToken(ctx *gin.Context) {
 	}
 	//检查refresh token 是否已经(退出)
 	err = u.CheckSession(ctx, claims.Ssid)
-	if err == nil {
-		//2.退出登录了
-		ctx.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
 	//如果不等于nil
-	if err != nil && err != redis.Nil {
+	if err != nil {
 		//redis 异常
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
