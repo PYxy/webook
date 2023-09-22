@@ -3,7 +3,6 @@ package homework
 import (
 	"context"
 	"strings"
-	at "sync/atomic"
 	"time"
 
 	"go.uber.org/atomic"
@@ -121,30 +120,30 @@ func (e *Efect) Send(ctx context.Context, biz string, phoneNumbers []string, arg
 	return nil
 }
 
-func (e *Efect) Async() {
-	go func() {
-		for {
-			result := e.needToCheck.Load()
-			if result != "" {
-				// 切割  "2,3"  分别代表索引的下标
-				for _, val := range CutString(result) {
-					if e.svcs[val].Healthy() {
-						for {
-							//这里可以一直抢 因为这个位置是检查坏的  正常的流程是不会 把坏的位置给占的(坏实例变好)
-							tmpRes := at.LoadUint32(&e.state)
-							if at.CompareAndSwapUint32(&e.state, tmpRes, tmpRes|1<<val) {
-								break
-							}
-						}
-
-					}
-				}
-			}
-			//无论什么情况都休眠
-			time.Sleep(e.interval)
-		}
-	}()
-}
+//func (e *Efect) Async() {
+//	go func() {
+//		for {
+//			result := e.needToCheck.Load()
+//			if result != "" {
+//				// 切割  "2,3"  分别代表索引的下标
+//				for _, val := range CutString(result) {
+//					if e.svcs[val].Healthy() {
+//						for {
+//							//这里可以一直抢 因为这个位置是检查坏的  正常的流程是不会 把坏的位置给占的(坏实例变好)
+//							tmpRes := at.LoadUint32(&e.state)
+//							if at.CompareAndSwapUint32(&e.state, tmpRes, tmpRes|1<<val) {
+//								break
+//							}
+//						}
+//
+//					}
+//				}
+//			}
+//			//无论什么情况都休眠
+//			time.Sleep(e.interval)
+//		}
+//	}()
+//}
 
 func CutString(indexStr string) []int {
 	return gocast.ToIntSlice(strings.Split(indexStr, ","))
