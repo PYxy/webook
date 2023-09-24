@@ -3,12 +3,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"gitee.com/geekbang/basic-go/webook/ioc"
+	logger2 "gitee.com/geekbang/basic-go/webook/pkg/logger"
+	"gitee.com/geekbang/basic-go/webook/pkg/zapx"
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/pflag"
-	_ "github.com/spf13/remote"
 	"github.com/spf13/viper"
+	_ "github.com/spf13/viper/remote"
 	"strings"
 	"time"
 
@@ -30,6 +32,7 @@ import (
 	"gitee.com/geekbang/basic-go/webook/internal/web"
 	"gitee.com/geekbang/basic-go/webook/internal/web/jwt"
 	"gitee.com/geekbang/basic-go/webook/internal/web/middleware"
+	"go.uber.org/zap"
 )
 
 /*
@@ -64,9 +67,61 @@ func main3() {
 // viper 测试
 func main() {
 	//initViper()
-	initViperV1()
+	//initViperV1()
 	//initViperV3()
-	ioc.InitMysql()
+	//ioc.InitMysql()
+	//initLogger()
+	//initLoggerv2()
+	initLoggerv3()
+}
+
+func initLogger() {
+	//https://blog.csdn.net/LinAndCurry/article/details/122239544
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	zap.L().Info("replace  前hello,go webook")
+	//如果不replace  直接使用zap.L() 什么都打印不出来
+	//替换全局zap 包变量
+	zap.ReplaceGlobals(logger)
+
+	zap.L().Info("hello,go webook")
+	//Error  会打印堆栈信息
+	zap.L().Error("验证码出错", zap.Error(errors.New("这是错误")))
+	type A struct {
+		Name string `json:"name1"`
+	}
+	zap.L().Info("验证码出错",
+		zap.Error(errors.New("这是错误")),
+		zap.Int16("id", 123),
+		zap.Any("一个结构体", A{
+			Name: "a",
+		}))
+
+}
+
+//自定义logger
+
+func initLoggerv2() {
+	//每个模块使用自定义的logger
+	//这里有问题
+	logger := zap.New(zapx.MyCore{})
+	logger.Info("掩码", zap.String("phone", "13719088000"))
+
+}
+
+// 适配器logger
+func initLoggerv3() {
+	//每个模块使用自定义的logger
+	//这里有问题
+	logger1, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	logger := logger2.NewZaplogger(logger1)
+	logger.Info("掩码", logger2.String("phone", "13719088000"))
+
 }
 
 func initWebServer(jwtHandler jwt.Handler) *gin.Engine {

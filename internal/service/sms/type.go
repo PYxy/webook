@@ -14,6 +14,6 @@ type Service interface {
 }
 
 type ArgVal struct {
-	Val  string
-	Name string
+	Val  string `json:"val"`
+	Name string `json:"name"`
 }

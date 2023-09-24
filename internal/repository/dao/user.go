@@ -29,7 +29,7 @@ func NewUserDAOv1(p DBProvider) UserDaoInterface {
 	return &UserDAO{
 		p: p,
 	}
-	
+
 }
 
 func NewUserDAO(db *gorm.DB) UserDaoInterface {

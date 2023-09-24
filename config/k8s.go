@@ -1,6 +1,5 @@
-/*
 //go:build k8s
-*/
+
 // 使用 k8s 这个编译标签
 package config
 
