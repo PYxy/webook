@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	_ "github.com/spf13/viper/remote"
+	glogger "gorm.io/gorm/logger"
 	"strings"
 	"time"
 
@@ -43,21 +44,21 @@ PS F:\git_push\webook>  go build -ldflags '-s -w' -o t99 .\main.go
 
 */
 
-func main3() {
-	//TODO 数据库连接对象初始化
-	db, cache := initDB()
-	//gin 服务初始化
-	jwtHandler := jwt.NewRedisJWTHandler(cache)
-	server := initWebServer(jwtHandler)
-	// 初始化 UserHandle
-	u := initUser(db, cache, jwtHandler)
-
-	//路由注册
-	u.RegisterRoutes(server)
-
-	server.Run(":8091")
-
-}
+//func main3() {
+//	//TODO 数据库连接对象初始化
+//	db, cache := initDB()
+//	//gin 服务初始化
+//	jwtHandler := jwt.NewRedisJWTHandler(cache)
+//	server := initWebServer(jwtHandler)
+//	// 初始化 UserHandle
+//	u := initUser(db, cache, jwtHandler)
+//
+//	//路由注册
+//	u.RegisterRoutes(server)
+//
+//	server.Run(":8091")
+//
+//}
 
 //func main2() {
 //	engine := InitWebServer()
@@ -231,8 +232,19 @@ func initUser(db *gorm.DB, cache v9.Cmdable, jwtHandler jwt.Handler) *web.UserHa
 	return u
 }
 
-func initDB() (*gorm.DB, v9.Cmdable) {
-	db, err := gorm.Open(mysql.Open(fmt.Sprintf("%s?charset=utf8&timeout=4s", config.Config.DB.DSN)))
+func initDB(logger logger2.LoggerV1) (*gorm.DB, v9.Cmdable) {
+	//mysql 自定义打印日志
+	db, err := gorm.Open(mysql.Open(fmt.Sprintf("%s?charset=utf8&timeout=4s", config.Config.DB.DSN)), &gorm.Config{
+		//需要一个logger glogger.New()
+		Logger: glogger.New(gormLoggerFunc(logger.Debug), glogger.Config{
+			//慢查询阈值
+			SlowThreshold: time.Millisecond * 100,
+			//是否忽略查找不到记录的异常
+			IgnoreRecordNotFoundError: true,
+			ParameterizedQueries:      true,
+			LogLevel:                  glogger.Info,
+		}),
+	})
 	if err != nil {
 		// 我只会在初始化过程中 panic
 		// panic 相当于整个 goroutine 结束
@@ -373,4 +385,15 @@ func initViperWatchV1() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+// 只有接口单方法能这样写
+type gormLoggerFunc func(msg string, fields ...logger2.Field)
+
+func (g gormLoggerFunc) Printf(msg string, args ...interface{}) {
+	g(msg, logger2.Field{
+		Key:   "args",
+		Value: args,
+	})
+
 }

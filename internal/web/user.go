@@ -167,6 +167,7 @@ func (u *UserHandler) SmsSend(ctx *gin.Context) {
 			Code: 1,
 			Msg:  "发送成功",
 		})
+		
 	case service.ErrFrequentlyForSend:
 		ctx.JSON(http.StatusOK, Result{
 			Code: 0,

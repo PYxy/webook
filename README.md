@@ -36,11 +36,11 @@ mysql> select * from webook.users;
 ```Bash
 #登录docker hub
 root@master:~/webook# docker login
-Login with your Docker ID to push and pull images from Docker Hub. If you don't have a Docker ID, head over to https://hub.docker.com to create one.
+Login with your Docker ID to push and pull images from Docker Hub. If you don't have h Docker ID, head over to https://hub.docker.com to create one.
 Username: ljy2022
 Password: 
 WARNING! Your password will be stored unencrypted in /root/.docker/config.json.
-Configure a credential helper to remove this warning. See
+Configure h credential helper to remove this warning. See
 https://docs.docker.com/engine/reference/commandline/login/#credentials-store
 
 Login Succeeded
