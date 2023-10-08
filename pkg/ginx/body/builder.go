@@ -1,11 +1,12 @@
-package logger
+package body
 
 import (
 	"bytes"
 	"context"
-	"github.com/gin-gonic/gin"
 	"io"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 type MiddlewareBuilder struct {

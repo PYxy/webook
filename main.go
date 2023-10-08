@@ -5,15 +5,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	logger2 "gitee.com/geekbang/basic-go/webook/pkg/logger"
-	"gitee.com/geekbang/basic-go/webook/pkg/zapx"
+	"strings"
+	"time"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	_ "github.com/spf13/viper/remote"
 	glogger "gorm.io/gorm/logger"
-	"strings"
-	"time"
+
+	local2 "gitee.com/geekbang/basic-go/webook/internal/service/sms/local"
+	logger2 "gitee.com/geekbang/basic-go/webook/pkg/logger"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
@@ -24,16 +26,16 @@ import (
 
 	v9 "github.com/redis/go-redis/v9"
 
+	"go.uber.org/zap"
+
 	"gitee.com/geekbang/basic-go/webook/config"
 	"gitee.com/geekbang/basic-go/webook/internal/repository"
 	"gitee.com/geekbang/basic-go/webook/internal/repository/cache/local"
 	"gitee.com/geekbang/basic-go/webook/internal/repository/dao"
 	"gitee.com/geekbang/basic-go/webook/internal/service"
-	"gitee.com/geekbang/basic-go/webook/internal/service/sms/aliyun"
 	"gitee.com/geekbang/basic-go/webook/internal/web"
 	"gitee.com/geekbang/basic-go/webook/internal/web/jwt"
 	"gitee.com/geekbang/basic-go/webook/internal/web/middleware"
-	"go.uber.org/zap"
 )
 
 /*
@@ -44,21 +46,22 @@ PS F:\git_push\webook>  go build -ldflags '-s -w' -o t99 .\main.go
 
 */
 
-//func main3() {
-//	//TODO 数据库连接对象初始化
-//	db, cache := initDB()
-//	//gin 服务初始化
-//	jwtHandler := jwt.NewRedisJWTHandler(cache)
-//	server := initWebServer(jwtHandler)
-//	// 初始化 UserHandle
-//	u := initUser(db, cache, jwtHandler)
-//
-//	//路由注册
-//	u.RegisterRoutes(server)
-//
-//	server.Run(":8091")
-//
-//}
+func main() {
+	//TODO 数据库连接对象初始化
+	logger := InitLogger()
+	db, cache := initDB(logger)
+	//gin 服务初始化
+	jwtHandler := jwt.NewRedisJWTHandler(cache)
+	server := initWebServer(jwtHandler)
+	// 初始化 UserHandle
+	u := initUser(db, cache, jwtHandler)
+
+	//路由注册
+	u.RegisterRoutes(server)
+
+	server.Run(":8091")
+
+}
 
 //func main2() {
 //	engine := InitWebServer()
@@ -66,14 +69,30 @@ PS F:\git_push\webook>  go build -ldflags '-s -w' -o t99 .\main.go
 //}
 
 // viper 测试
-func main() {
+func mainInit() {
 	//initViper()
 	//initViperV1()
 	//initViperV3()
 	//ioc.InitMysql()
 	//initLogger()
 	//initLoggerv2()
+	//日志初始化
 	initLoggerv3()
+}
+
+func InitLogger() logger2.LoggerV1 {
+	// 这里我们用一个小技巧，
+	// 就是直接使用 zap 本身的配置结构体来处理
+	cfg := zap.NewDevelopmentConfig()
+	err := viper.UnmarshalKey("log", &cfg)
+	if err != nil {
+		panic(err)
+	}
+	l, err := cfg.Build()
+	if err != nil {
+		panic(err)
+	}
+	return logger2.NewZaplogger(l)
 }
 
 func initLogger() {
@@ -99,16 +118,6 @@ func initLogger() {
 		zap.Any("一个结构体", A{
 			Name: "a",
 		}))
-
-}
-
-//自定义logger
-
-func initLoggerv2() {
-	//每个模块使用自定义的logger
-	//这里有问题
-	logger := zap.New(zapx.MyCore{})
-	logger.Info("掩码", zap.String("phone", "13719088000"))
 
 }
 
@@ -202,17 +211,14 @@ func initUser(db *gorm.DB, cache v9.Cmdable, jwtHandler jwt.Handler) *web.UserHa
 
 	//code svc 构建
 
-	//本地短信服务
-	//localSms := lc.NewLocalSmsService()
-
 	//阿里云短信服务
-	alSms := aliyun.NewAliyunService(
-		"LTAI5tRXqWrLkYN1qrMGyp8U",
-		"JXqo4X5UvLsQefUjZlqItcd1GlacQp",
-		"cn-hangzhou",
-		"阿里云短信测试",
-		"SMS_154950909",
-	)
+	//alSms := aliyun.NewAliyunService(
+	//	"",
+	//	"",
+	//	"cn-hangzhou",
+	//	"阿里云短信测试",
+	//	"SMS_154950909",
+	//)
 
 	//redis短信验证服务
 	//codeCache := cache2.NewRedisCodeCache(cache)
@@ -221,9 +227,9 @@ func initUser(db *gorm.DB, cache v9.Cmdable, jwtHandler jwt.Handler) *web.UserHa
 	//本地短信验证服务
 	localCache := local.NewLocalSmsCache()
 	codeRepo := repository.NewCodeRepository(localCache)
-
+	localSms := local2.NewLocalSmsService()
 	//使用本地短信(只打印出来验证码 不发短信 用于测试)
-	codeSvc := service.NewCodeService(alSms, codeRepo)
+	codeSvc := service.NewCodeService(localSms, codeRepo)
 
 	//使用阿里云 发送短信
 	//codeSvc := service.NewCodeService(alSms, codeRepo)

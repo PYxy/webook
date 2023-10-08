@@ -14,6 +14,7 @@ import (
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
 	"gitee.com/geekbang/basic-go/webook/internal/service"
 	mJwt "gitee.com/geekbang/basic-go/webook/internal/web/jwt"
+	"gitee.com/geekbang/basic-go/webook/pkg/ginx/logger3"
 )
 
 // UserHandler User服务路由定义
@@ -63,6 +64,7 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/loginJWT", u.LoginJWT)
 	ug.POST("/logoutJWT", u.LogoutJWT)
 	ug.POST("/edit", u.Edit)
+	ug.POST("/edit2", u.Edit2)
 
 	//短信验证登录 并按实际情况注册
 	ug.POST("/login_sms/code/send", u.SmsSend)
@@ -167,7 +169,7 @@ func (u *UserHandler) SmsSend(ctx *gin.Context) {
 			Code: 1,
 			Msg:  "发送成功",
 		})
-		
+
 	case service.ErrFrequentlyForSend:
 		ctx.JSON(http.StatusOK, Result{
 			Code: 0,
@@ -471,6 +473,38 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 	}
 
 	ctx.String(http.StatusOK, "修改成功")
+}
+
+func (u *UserHandler) Edit2(ctx *gin.Context) {
+	type EditReq struct {
+		NickName string `form:"nick_name" validate:"omitempty,gte=3,lt=20" binding:"omitempty,gte=3,lt=20"`
+		BirthDay string `form:"birthDay" binding:"omitempty"`
+		Describe string `form:"describe" validate:"omitempty,min=0,max=50" binding:"omitempty,min=0,max=50"`
+	}
+
+	fun := func(ctx *gin.Context, editReq EditReq, uc *mJwt.UserClaims) (logger3.Result, error) {
+		if err := u.svc.Edit(ctx, domain.User{
+			//Id:       val.(int64),
+			Id:       uc.Uid,
+			NickName: editReq.NickName,
+			BirthDay: editReq.BirthDay,
+			Describe: editReq.Describe,
+		}); err != nil {
+			return logger3.Result{
+				Code: 0,
+				Msg:  "系统异常",
+				Data: nil,
+			}, err
+		}
+
+		//ctx.String(http.StatusOK, "修改成功")
+		return logger3.Result{
+			Code: 1,
+			Msg:  "修改成功",
+			Data: nil,
+		}, nil
+	}
+	logger3.WrapReq[EditReq](fun)(ctx)
 }
 
 func (u *UserHandler) Profile(ctx *gin.Context) {

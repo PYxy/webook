@@ -1,48 +1,47 @@
 package logger3
 
 import (
-	"github.com/gin-gonic/gin"
+	"fmt"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
+
+	"gitee.com/geekbang/basic-go/webook/internal/web/jwt"
 )
 
-type AppHandleError[T any] func(ctx *gin.Context, req T) (Result, error)
-
-func InnerWarp[T any](handler AppHandleError[T]) gin.HandlerFunc {
-
-	return func(ctx *gin.Context) {
-
-	}
+type Result struct {
+	// 这个叫做业务错误码
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data any    `json:"data"`
 }
 
-func NewFunc[T any](func(ctx *gin.Context)) AppHandleError[T] {
-	return func(ctx *gin.Context, req T) (Result, error) {
-		var (
-			res Result
-			err error
-		)
+// WrapReqForLogin 需要关注登录状态的
+type WrapReqForLogin[req any] func(ctx *gin.Context, request req, uc *jwt.UserClaims) (Result, error)
 
-		return res, err
-	}
-}
-
-func WrapReq[T any](fn func(ctx *gin.Context, req T) (Result, error)) gin.HandlerFunc {
+func WrapReq[req any](fun WrapReqForLogin[req]) gin.HandlerFunc {
 
 	return func(ctx *gin.Context) {
-		var req T
-
-		if err := ctx.Bind(&req); err != nil {
-			//打印日志
-			return
-		}
-		res, err := fn(ctx, req)
+		var re req
+		err := ctx.ShouldBind(&re)
 		if err != nil {
-			//打印日志
+			//bing  有异常绑定处理  直接返回就行
+			fmt.Println("参数绑定异常:", err.Error())
+			ctx.JSON(http.StatusOK, Result{
+				Code: 0,
+				Msg:  "参数合法性验证失败",
+				Data: nil,
+			})
 			return
 		}
-
+		val, _ := ctx.Get("claims")
+		uc, _ := val.(*jwt.UserClaims)
+		res, err := fun(ctx, re, uc)
+		if err != nil {
+			fmt.Println("处理函数异常：", err)
+			ctx.JSON(http.StatusOK, res)
+			return
+		}
 		ctx.JSON(http.StatusOK, res)
 	}
-}
-
-type Result struct {
 }
