@@ -1,5 +1,5 @@
 db.mysql:
-  dsn: "root:root@tcp(webook-mysql-service:3308)/webook"
+  dsn: "root:root@tcp(webook-mysql-service:3308)/webook1"
 
 redis:
   dsn: "webook-redis-service:6380"

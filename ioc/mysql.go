@@ -2,10 +2,11 @@ package ioc
 
 import (
 	"fmt"
-	"github.com/fsnotify/fsnotify"
-	"github.com/spf13/viper"
 	"sync/atomic"
 	"unsafe"
+
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/viper"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -62,8 +63,9 @@ func InitMysql() *gorm.DB {
 			if err != nil {
 				fmt.Println("动态获取新配置文件时,mysql 初始化失败")
 			}
-			pt := unsafe.Pointer(&db)
-			atomic.StorePointer(&pt, unsafe.Pointer(&newdb))
+			pt := unsafe.Pointer(db)
+
+			atomic.StorePointer(&pt, unsafe.Pointer(newdb))
 
 		})
 		//要用原子操作
