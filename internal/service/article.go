@@ -2,33 +2,63 @@ package service
 
 import (
 	"context"
-	"gitee.com/geekbang/basic-go/webook/internal/domain"
-	"gitee.com/geekbang/basic-go/webook/internal/repository/article"
-	"gitee.com/geekbang/basic-go/webook/pkg/logger"
 	"time"
+
+	"gitee.com/geekbang/basic-go/webook/internal/domain"
+	"gitee.com/geekbang/basic-go/webook/internal/repository"
+	"gitee.com/geekbang/basic-go/webook/pkg/logger"
 )
 
 type ArticleService interface {
 	Save(ctx context.Context, art domain.Article) (int64, error)
 	Publish(ctx context.Context, art domain.Article) (int64, error)
+	Withdraw(ctx context.Context, uid, id int64) error
 	PublishV1(ctx context.Context, art domain.Article) (int64, error)
+	List(ctx context.Context, author int64,
+		offset, limit int) ([]domain.Article, error)
+	GetById(ctx context.Context, id int64) (domain.Article, error)
+
+	// GetPublishedById 查找已经发表的
+	// 剩下的这个是给读者用的服务，暂时放到这里
+	// 正常来说在微服务架构下，读者服务和创作者服务会是两个独立的服务
+	GetPublishedById(ctx context.Context, id int64) (domain.Article, error)
 }
 
 type articleService struct {
-	repo article.ArticleRepository
+	// 1. 在 service 这一层使用两个 repository
+	author repository.ArticleAuthorRepository
+	reader repository.ArticleReaderRepository
 
-	// V1
-	author article.ArticleAuthorRepository
-	reader article.ArticleReaderRepository
-	l      logger.LoggerV1
+	// 2. 在 repo 里面处理制作库和线上库
+	repo repository.ArticleRepository
+
+	l logger.LoggerV1
+}
+
+func (a *articleService) Withdraw(ctx context.Context, uid, id int64) error {
+	//TODO implement me
+	return a.repo.SyncStatus(ctx, uid, id, domain.ArticleStatusPrivate)
+}
+
+func (a *articleService) List(ctx context.Context, author int64, offset, limit int) ([]domain.Article, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (a *articleService) GetById(ctx context.Context, id int64) (domain.Article, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (a *articleService) GetPublishedById(ctx context.Context, id int64) (domain.Article, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (a *articleService) Publish(ctx context.Context, art domain.Article) (int64, error) {
-	// 制作库
-	//id, err := a.repo.Create(ctx, art)
-	//// 线上库呢？
-	//a.repo.SyncToLiveDB(ctx, art)
-	panic("implement me")
+	art.Status = domain.ArticleStatusPublished
+
+	return a.repo.Sync(ctx, art)
 }
 
 func (a *articleService) PublishV1(ctx context.Context, art domain.Article) (int64, error) {
@@ -67,14 +97,14 @@ func (a *articleService) PublishV1(ctx context.Context, art domain.Article) (int
 	return id, err
 }
 
-func NewArticleService(repo article.ArticleRepository) ArticleService {
+func NewArticleService(repo repository.ArticleRepository) ArticleService {
 	return &articleService{
 		repo: repo,
 	}
 }
 
-func NewArticleServiceV1(author article.ArticleAuthorRepository,
-	reader article.ArticleReaderRepository, l logger.LoggerV1) ArticleService {
+func NewArticleServiceV1(author repository.ArticleAuthorRepository,
+	reader repository.ArticleReaderRepository, l logger.LoggerV1) ArticleService {
 	return &articleService{
 		author: author,
 		reader: reader,
@@ -83,6 +113,8 @@ func NewArticleServiceV1(author article.ArticleAuthorRepository,
 }
 
 func (a *articleService) Save(ctx context.Context, art domain.Article) (int64, error) {
+	// 设置为未发表
+	art.Status = domain.ArticleStatusUnpublished
 	if art.Id > 0 {
 		err := a.repo.Update(ctx, art)
 		return art.Id, err

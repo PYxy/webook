@@ -98,7 +98,7 @@ func (mr *MockUserDaoInterfaceMockRecorder) FindByWeChat(ctx, openId interface{}
 // Insert mocks base method.
 func (m *MockUserDaoInterface) Insert(ctx context.Context, u dao.User) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Insert", ctx, u)
+	ret := m.ctrl.Call(m, "Create", ctx, u)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
@@ -106,7 +106,7 @@ func (m *MockUserDaoInterface) Insert(ctx context.Context, u dao.User) error {
 // Insert indicates an expected call of Insert.
 func (mr *MockUserDaoInterfaceMockRecorder) Insert(ctx, u interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Insert", reflect.TypeOf((*MockUserDaoInterface)(nil).Insert), ctx, u)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockUserDaoInterface)(nil).Insert), ctx, u)
 }
 
 // Update mocks base method.
