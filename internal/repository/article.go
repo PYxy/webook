@@ -56,8 +56,11 @@ func (c *CachedArticleRepository) List(ctx context.Context, author int64, offset
 }
 
 func (c *CachedArticleRepository) Sync(ctx context.Context, art domain.Article) (int64, error) {
-	//TODO implement me
-	panic("implement me")
+	id, err := c.dao.Sync(ctx, c.toEntity(art))
+	if err != nil {
+		return 0, err
+	}
+	return id, err
 }
 
 func (c *CachedArticleRepository) SyncStatus(ctx context.Context, uid, id int64, status domain.ArticleStatus) error {

@@ -115,6 +115,11 @@ func (m *MongoDBDAO) Sync(ctx context.Context, art Article) (int64, error) {
 		bson.E{Key: "author_id", Value: art.AuthorId}}
 	now := time.Now().UnixMilli()
 	art.Utime = now
+	/*
+		如果upsert设为true。
+		当满足查询条件的记录存在，则不执行$setOnInsert中的操作，
+		当满足条件的记录不存在则执行$setOnInsert操作。
+	*/
 	_, err = m.liveCol.UpdateOne(ctx, filter,
 		bson.D{bson.E{Key: "$set", Value: art},
 			bson.E{Key: "$setOnInsert",

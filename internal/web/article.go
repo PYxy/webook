@@ -17,6 +17,14 @@ type ArticleHandler struct {
 	l   logger2.LoggerV1
 }
 
+func NewArticleHandler(svc service.ArticleService,
+	l logger2.LoggerV1) *ArticleHandler {
+	return &ArticleHandler{
+		svc: svc,
+		l:   l,
+	}
+}
+
 func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/articles")
 	// 在有 list 等路由的时候，无法这样注册
@@ -111,7 +119,7 @@ func (h *ArticleHandler) Withdraw(ctx *gin.Context) {
 		h.l.Error("反序列化请求失败", logger2.Error(err))
 		return
 	}
-	usr, ok := ctx.MustGet("user").(*LUserClaims)
+	usr, ok := ctx.MustGet("claims").(*LUserClaims)
 	if !ok {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
