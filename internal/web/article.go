@@ -25,7 +25,11 @@ func NewArticleHandler(svc service.ArticleService,
 	}
 }
 
-func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
+func (h *ArticleHandler) RegisterPublicRoutes(server *gin.Engine) {
+
+}
+
+func (h *ArticleHandler) RegisterPrivateRoutes(server *gin.Engine) {
 	g := server.Group("/articles")
 	// 在有 list 等路由的时候，无法这样注册
 
@@ -40,7 +44,6 @@ func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	pub := g.Group("/pub")
 	//pub.GET("/pub", a.PubList)
 	pub.GET("/:id", h.PubDetail)
-
 }
 
 func (h *ArticleHandler) Publish(ctx *gin.Context) {

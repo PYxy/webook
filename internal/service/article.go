@@ -97,9 +97,10 @@ func (a *articleService) PublishV1(ctx context.Context, art domain.Article) (int
 	return id, err
 }
 
-func NewArticleService(repo repository.ArticleRepository) ArticleService {
+func NewArticleService(repo repository.ArticleRepository, l logger.LoggerV1) ArticleService {
 	return &articleService{
 		repo: repo,
+		l:    l,
 	}
 }
 

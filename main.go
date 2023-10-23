@@ -14,6 +14,7 @@ import (
 	_ "github.com/spf13/viper/remote"
 	glogger "gorm.io/gorm/logger"
 
+	"gitee.com/geekbang/basic-go/webook/internal/repository/dao/article"
 	local2 "gitee.com/geekbang/basic-go/webook/internal/service/sms/local"
 	logger2 "gitee.com/geekbang/basic-go/webook/pkg/logger"
 
@@ -51,13 +52,13 @@ func main() {
 	logger := InitLogger()
 	db, cache := initDB(logger)
 	//gin 服务初始化
+	l := logger2.NewNoOpLogger()
 	jwtHandler := jwt.NewRedisJWTHandler(cache)
-	server := initWebServer(jwtHandler)
+	user := initUser(db, cache, jwtHandler)
+	a := initArticle(db, l)
+	//中间件绑定以及路由注册
+	server := initWebServer(jwtHandler, user, a)
 	// 初始化 UserHandle
-	u := initUser(db, cache, jwtHandler)
-
-	//路由注册
-	u.RegisterRoutes(server)
 
 	server.Run(":8091")
 
@@ -134,10 +135,10 @@ func initLoggerv3() {
 
 }
 
-func initWebServer(jwtHandler jwt.Handler) *gin.Engine {
+func initWebServer(jwtHandler jwt.Handler, userhandler *web.UserHandler, articleHandler *web.ArticleHandler) *gin.Engine {
 	server := gin.Default()
 
-	//TODO 中间件注册
+	//TODO 通用中间件注册
 	server.Use(func(ctx *gin.Context) {
 		println("这是第一个 middleware")
 	})
@@ -184,13 +185,22 @@ func initWebServer(jwtHandler jwt.Handler) *gin.Engine {
 	//	IgnorePaths("/users/login").Build())
 	//TODO  这是使用JWT  进行登录验证
 
+	//TODO base 上面的是通用中间件
+	userhandler.RegisterPublicRoutes(server)
+	articleHandler.RegisterPublicRoutes(server)
+
+	//TODO 下面的是有私有中间件(要进行验证的)
 	server.Use(middleware.NewLoginJWTMiddlewareBuilder(jwtHandler).
-		IgnorePaths("/users/signup").
-		IgnorePaths("/users/login_sms/code/send").
-		IgnorePaths("/users/login_sms").
-		IgnorePaths("/users/loginJWT").
-		IgnorePaths("/oauth2/wechat/authurl").IgnorePaths("/oauth2/wechat/callback").
-		IgnorePaths("/users/refresh_token").Build())
+		//IgnorePaths("/users/signup").
+		//IgnorePaths("/users/login_sms/code/send").
+		//IgnorePaths("/users/login_sms").
+		//IgnorePaths("/users/loginJWT").
+		//IgnorePaths("/oauth2/wechat/authurl").IgnorePaths("/oauth2/wechat/callback").
+		//IgnorePaths("/users/refresh_token").
+		Build())
+
+	userhandler.RegisterPrivateRoutes(server)
+	articleHandler.RegisterPrivateRoutes(server)
 	// v1
 	//middleware.IgnorePaths = []string{"sss"}
 	//server.Use(middleware.CheckLogin())
@@ -236,6 +246,14 @@ func initUser(db *gorm.DB, cache v9.Cmdable, jwtHandler jwt.Handler) *web.UserHa
 
 	u := web.NewUserHandler(svc, codeSvc, jwtHandler)
 	return u
+}
+
+func initArticle(db *gorm.DB,
+	l logger2.LoggerV1) *web.ArticleHandler {
+	gormDao := article.NewGORMArticleDAO(db)
+	repo := repository.NewArticleRepository(gormDao, l)
+	svc := service.NewArticleService(repo, l)
+	return web.NewArticleHandler(svc, l)
 }
 
 func initDB(logger logger2.LoggerV1) (*gorm.DB, v9.Cmdable) {

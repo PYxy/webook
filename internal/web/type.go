@@ -3,5 +3,6 @@ package web
 import "github.com/gin-gonic/gin"
 
 type handler interface {
-	RegisterRoutes(server *gin.Engine)
+	RegisterPublicRoutes(server *gin.Engine)
+	RegisterPrivateRoutes(server *gin.Engine)
 }

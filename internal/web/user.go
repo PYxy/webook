@@ -28,7 +28,7 @@ type UserHandler struct {
 }
 
 // 假定 UserHandler 上实现了 handler 接口
-//var _ handler = (*UserHandler)(nil)
+var _ handler = (*UserHandler)(nil)
 
 func NewUserHandler(svc service.UserService, codeSvc service.CodeService, jwtHandler mJwt.Handler) *UserHandler {
 	const (
@@ -55,16 +55,12 @@ func (u *UserHandler) RegisterRoutesV1(ug *gin.RouterGroup) {
 	ug.POST("/edit", u.Edit)
 }
 
-func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
+func (u *UserHandler) RegisterPublicRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
-	ug.GET("/profile", u.Profile)
-	ug.GET("/profileJWT", u.ProfileJWT)
 	ug.POST("/signup", u.SignUp)
 	ug.POST("/login", u.Login)
 	ug.POST("/loginJWT", u.LoginJWT)
 	ug.POST("/logoutJWT", u.LogoutJWT)
-	ug.POST("/edit", u.Edit)
-	ug.POST("/edit2", u.Edit2)
 
 	//短信验证登录 并按实际情况注册
 	ug.POST("/login_sms/code/send", u.SmsSend)
@@ -73,6 +69,16 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login_token", u.TokenLogin)
 	//更新长度token
 	ug.POST("/refresh_token", u.RefreshToken)
+}
+
+func (u *UserHandler) RegisterPrivateRoutes(server *gin.Engine) {
+	ug := server.Group("/users")
+	ug.GET("/profile", u.Profile)
+	ug.GET("/profileJWT", u.ProfileJWT)
+
+	ug.POST("/edit", u.Edit)
+	ug.POST("/edit2", u.Edit2)
+
 }
 
 func (u *UserHandler) TokenLogin(ctx *gin.Context) {

@@ -122,8 +122,9 @@ func (repo *CachedArticleRepository) toEntity(art domain.Article) article.Articl
 	}
 }
 
-func NewArticleRepository(dao article.ArticleDAO) ArticleRepository {
+func NewArticleRepository(dao article.ArticleDAO, l logger.LoggerV1) ArticleRepository {
 	return &CachedArticleRepository{
 		dao: dao,
+		l:   l,
 	}
 }
