@@ -20,7 +20,7 @@ import (
 func InitWeb(middleWare []gin.HandlerFunc, handler *web.UserHandler) *gin.Engine {
 	server := gin.Default()
 	//路由注册
-	handler.RegisterRoutes(server)
+	//handler.RegisterRoutes(server)
 
 	//中间件注册
 	server.Use(middleWare...)

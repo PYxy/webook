@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"gitee.com/geekbang/basic-go/webook/internal/web/jwt"
+	"gitee.com/geekbang/basic-go/webook/pkg/logger"
 )
 
 type Result struct {
@@ -15,6 +16,8 @@ type Result struct {
 	Msg  string `json:"msg"`
 	Data any    `json:"data"`
 }
+
+var L logger.LoggerV1
 
 // WrapReqForLogin 需要关注登录状态的
 type WrapReqForLogin[req any] func(ctx *gin.Context, request req, uc *jwt.UserClaims) (Result, error)
@@ -43,5 +46,37 @@ func WrapReq[req any](fun WrapReqForLogin[req]) gin.HandlerFunc {
 			return
 		}
 		ctx.JSON(http.StatusOK, res)
+	}
+}
+
+func WrapToken[C jwt.UserClaims](fn func(ctx *gin.Context, uc C) (Result, error)) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		// 执行一些东西
+		val, ok := ctx.Get("users")
+		if !ok {
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		c, ok := val.(C)
+		if !ok {
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		// 下半段的业务逻辑从哪里来？
+		// 我的业务逻辑有可能要操作 ctx
+		// 你要读取 HTTP HEADER
+		res, err := fn(ctx, c)
+		if err != nil {
+			// 开始处理 error，其实就是记录一下日志
+			//L.Error("处理业务逻辑出错",
+			//	logger.String("path", ctx.Request.URL.Path),
+			//	// 命中的路由
+			//	logger.String("route", ctx.FullPath()),
+			//	logger.Error(err))
+		}
+		ctx.JSON(http.StatusOK, res)
+		// 再执行一些东西
 	}
 }

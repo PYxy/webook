@@ -42,12 +42,12 @@ func (a *articleService) Withdraw(ctx context.Context, uid, id int64) error {
 
 func (a *articleService) List(ctx context.Context, author int64, offset, limit int) ([]domain.Article, error) {
 	//TODO implement me
-	panic("implement me")
+	return a.repo.List(ctx, author, offset, limit)
+
 }
 
 func (a *articleService) GetById(ctx context.Context, id int64) (domain.Article, error) {
-	//TODO implement me
-	panic("implement me")
+	return a.repo.GetByID(ctx, id)
 }
 
 func (a *articleService) GetPublishedById(ctx context.Context, id int64) (domain.Article, error) {

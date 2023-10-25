@@ -48,6 +48,17 @@ PS F:\git_push\webook>  go build -ldflags '-s -w' -o t99 .\main.go
 */
 
 func main() {
+	cfile := pflag.String("config", "F:\\git_push\\webook\\test_demo\\dev.yaml", "指定配置文件的路径")
+	pflag.Parse()
+
+	viper.SetConfigFile(*cfile)
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(err)
+	}
+	dsn := viper.GetString("db.mysql.dsn")
+	fmt.Println("mysql 连接地址:", dsn)
+	viper.WatchConfig()
 	//TODO 数据库连接对象初始化
 	logger := InitLogger()
 	db, cache := initDB(logger)

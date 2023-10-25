@@ -1,12 +1,18 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
+	"github.com/ecodeclub/ekit/slice"
 	"github.com/gin-gonic/gin"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
 	"gitee.com/geekbang/basic-go/webook/internal/service"
+	"gitee.com/geekbang/basic-go/webook/internal/web/jwt"
+	"gitee.com/geekbang/basic-go/webook/pkg/ginx/logger3"
 	logger2 "gitee.com/geekbang/basic-go/webook/pkg/logger"
 )
 
@@ -33,11 +39,12 @@ func (h *ArticleHandler) RegisterPrivateRoutes(server *gin.Engine) {
 	g := server.Group("/articles")
 	// 在有 list 等路由的时候，无法这样注册
 
-	g.GET("/detail/:id", h.Detail)
+	//g.GET("/detail/:id", h.Detail)
 	// 理论上来说应该用 GET的，但是我实在不耐烦处理类型转化
 	// 直接 POST，JSON 转一了百了。
-	g.POST("/list", h.List)
-
+	g.POST("/list",
+		logger3.WrapReq[ListReq](h.List))
+	g.GET("/detail/:id", logger3.WrapToken[jwt.UserClaims](h.Detail))
 	g.POST("/edit", h.Edit)
 	g.POST("/publish", h.Publish)
 	g.POST("/withdraw", h.Withdraw)
@@ -149,27 +156,71 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 
 }
 
-func (h *ArticleHandler) List(ctx *gin.Context) {
-
-}
-
-func (h *ArticleHandler) Detail(ctx *gin.Context) {
-
-}
-
-type ArticleReq struct {
-	Id      int64  `json:"id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
-}
-
-func (req ArticleReq) toDomain(uid int64) domain.Article {
-	return domain.Article{
-		Id:      req.Id,
-		Title:   req.Title,
-		Content: req.Content,
-		Author: domain.Author{
-			Id: uid,
-		},
+func (h *ArticleHandler) List(ctx *gin.Context, req ListReq, uc *jwt.UserClaims) (logger3.Result, error) {
+	res, err := h.svc.List(ctx, uc.Uid, req.Offset, req.Limit)
+	if err != nil {
+		return logger3.Result{
+			Code: 5,
+			Msg:  "系统错误",
+		}, nil
 	}
+	return logger3.Result{
+		Data: slice.Map[domain.Article, ArticleVO](res,
+			func(idx int, src domain.Article) ArticleVO {
+				return ArticleVO{
+					Id:       src.Id,
+					Title:    src.Title,
+					Abstract: src.Abstract(), //这个是摘要  如果是放在oss 的话 这个要另外存储在mysql 中
+					Status:   src.Status.ToUint8(),
+					// 这个列表请求，不需要返回内容
+					//Content: src.Content,
+					// 这个是创作者看自己的文章列表，也不需要这个字段
+					//Author: src.Author
+					Ctime: src.Ctime.Format(time.DateTime),
+					Utime: src.Utime.Format(time.DateTime),
+				}
+			}),
+	}, nil
+}
+
+func (h *ArticleHandler) Detail(ctx *gin.Context, usr jwt.UserClaims) (logger3.Result, error) {
+	idstr := ctx.Param("id")
+	id, err := strconv.ParseInt(idstr, 10, 64)
+	if err != nil {
+		return logger3.Result{
+			Code: 4,
+			Msg:  "参数错误",
+		}, err
+	}
+	art, err := h.svc.GetById(ctx, id)
+	if err != nil {
+		//ctx.JSON(http.StatusOK, )
+		//a.l.Error("获得文章信息失败", logger.Error(err))
+		return logger3.Result{
+			Code: 5,
+			Msg:  "系统错误",
+		}, err
+	}
+	// 这是不借助数据库查询来判定的方法
+	//要判断查询的文章作者 跟 当前登录信息的用户id 是否一致
+	if art.Author.Id != usr.Uid {
+		return logger3.Result{
+			Code: 5,
+			Msg:  "用户信息异常",
+		}, fmt.Errorf("非法访问文章，创作者 ID 不匹配 %d", usr.Uid)
+	}
+	return logger3.Result{
+		Data: ArticleVO{
+			Id:    art.Id,
+			Title: art.Title,
+			// 不需要这个摘要信息
+			//Abstract: art.Abstract(),
+			Status:  art.Status.ToUint8(),
+			Content: art.Content,
+			// 这个是创作者看自己的文章列表，也不需要这个字段
+			//Author: art.Author
+			Ctime: art.Ctime.Format(time.DateTime),
+			Utime: art.Utime.Format(time.DateTime),
+		},
+	}, nil
 }

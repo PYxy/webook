@@ -3,9 +3,11 @@ package repository
 import (
 	"context"
 
+	"github.com/ecodeclub/ekit/slice"
 	"gorm.io/gorm"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
+	"gitee.com/geekbang/basic-go/webook/internal/repository/cache"
 	"gitee.com/geekbang/basic-go/webook/internal/repository/dao/article"
 	"gitee.com/geekbang/basic-go/webook/pkg/logger"
 )
@@ -15,7 +17,7 @@ type ArticleRepository interface {
 	Update(ctx context.Context, art domain.Article) error
 	List(ctx context.Context, author int64,
 		offset int, limit int) ([]domain.Article, error)
-
+	GetByID(ctx context.Context, id int64) (domain.Article, error)
 	// Sync 本身要求先保存到制作库，再同步到线上库
 	Sync(ctx context.Context, art domain.Article) (int64, error)
 	// SyncStatus 仅仅同步状态
@@ -46,13 +48,57 @@ type CachedArticleRepository struct {
 	readerDAO article.ArticleReaderDAO
 
 	// SyncV2 用
-	db *gorm.DB
-	l  logger.LoggerV1
+	db    *gorm.DB
+	cache cache.ArticleCache
+	l     logger.LoggerV1
+}
+
+func (c *CachedArticleRepository) GetByID(ctx context.Context, id int64) (domain.Article, error) {
+	data, err := c.dao.GetById(ctx, id)
+	if err != nil {
+		return domain.Article{}, err
+	}
+	return c.toDomain(data), nil
 }
 
 func (c *CachedArticleRepository) List(ctx context.Context, author int64, offset int, limit int) ([]domain.Article, error) {
-	//TODO implement me
-	panic("implement me")
+	// 你在这个地方，集成你的复杂的缓存方案
+	// 你只缓存这一页
+	if offset == 0 && limit <= 100 {
+		data, err := c.cache.GetFirstPage(ctx, author)
+		if err == nil {
+			go func() {
+				//缓存
+				c.preCache(ctx, data)
+			}()
+			//return data[:limit], err
+			return data, err
+		}
+	}
+	//查询mysql
+	res, err := c.dao.GetByAuthor(ctx, author, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	data := slice.Map[article.Article, domain.Article](res, func(idx int, src article.Article) domain.Article {
+		return c.toDomain(src)
+	})
+	// 回写缓存的时候，可以同步，也可以异步
+	go func() {
+		err := c.cache.SetFirstPage(ctx, author, data)
+		c.l.Error("回写缓存失败", logger.Error(err))
+		c.preCache(ctx, data)
+	}()
+	return data, nil
+}
+
+func (c *CachedArticleRepository) preCache(ctx context.Context, data []domain.Article) {
+	if len(data) > 0 && len(data[0].Content) < 1024*1024 {
+		err := c.cache.Set(ctx, data[0])
+		if err != nil {
+			c.l.Error("提前预加载缓存失败", logger.Error(err))
+		}
+	}
 }
 
 func (c *CachedArticleRepository) Sync(ctx context.Context, art domain.Article) (int64, error) {

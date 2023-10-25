@@ -78,6 +78,7 @@ func (u *UserHandler) RegisterPrivateRoutes(server *gin.Engine) {
 
 	ug.POST("/edit", u.Edit)
 	ug.POST("/edit2", u.Edit2)
+	ug.POST("/edit3", logger3.WrapReq[EditReq](u.Edit3))
 
 }
 
@@ -513,6 +514,28 @@ func (u *UserHandler) Edit2(ctx *gin.Context) {
 	logger3.WrapReq[EditReq](fun)(ctx)
 }
 
+func (u *UserHandler) Edit3(ctx *gin.Context, req EditReq, uc *mJwt.UserClaims) (logger3.Result, error) {
+	if err := u.svc.Edit(ctx, domain.User{
+		//Id:       val.(int64),
+		Id:       uc.Uid,
+		NickName: req.NickName,
+		BirthDay: req.BirthDay,
+		Describe: req.Describe,
+	}); err != nil {
+		return logger3.Result{
+			Code: 0,
+			Msg:  "系统异常",
+			Data: nil,
+		}, err
+	}
+
+	return logger3.Result{
+		Code: 1,
+		Msg:  "修改成功",
+		Data: nil,
+	}, nil
+}
+
 func (u *UserHandler) Profile(ctx *gin.Context) {
 	type EditReq struct {
 		Email    string `json:"email"`
@@ -651,4 +674,10 @@ type TokenClaims struct {
 	Fingerprint string
 	//用于查找用户信息的一个字段
 	Id int64
+}
+
+type EditReq struct {
+	NickName string `form:"nick_name" validate:"omitempty,gte=3,lt=20" binding:"omitempty,gte=3,lt=20"`
+	BirthDay string `form:"birthDay" binding:"omitempty"`
+	Describe string `form:"describe" validate:"omitempty,min=0,max=50" binding:"omitempty,min=0,max=50"`
 }

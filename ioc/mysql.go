@@ -2,10 +2,7 @@ package ioc
 
 import (
 	"fmt"
-	"sync/atomic"
-	"unsafe"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 
 	"gorm.io/driver/mysql"
@@ -55,25 +52,25 @@ func InitMysql() *gorm.DB {
 		panic(err)
 	}
 
-	dao.NewUserDAOv1(func() *gorm.DB {
-		// 动态获取db 配置
-		viper.OnConfigChange(func(in fsnotify.Event) {
-			dsn = viper.GetString("mysql.dsn")
-			newdb, err := gorm.Open(mysql.Open(dsn))
-			if err != nil {
-				fmt.Println("动态获取新配置文件时,mysql 初始化失败")
-			}
-			pt := unsafe.Pointer(db)
-
-			atomic.StorePointer(&pt, unsafe.Pointer(newdb))
-
-		})
-		//要用原子操作
-		//pt := unsafe.Pointer(&db)
-		//val :=atomic.LoadPointer(&pt)
-		//return (*gorm.DB)(val)
-		return db
-	})
+	//dao.NewUserDAOv1(func() *gorm.DB {
+	//	// 动态获取db 配置
+	//	viper.OnConfigChange(func(in fsnotify.Event) {
+	//		dsn = viper.GetString("mysql.dsn")
+	//		newdb, err := gorm.Open(mysql.Open(dsn))
+	//		if err != nil {
+	//			fmt.Println("动态获取新配置文件时,mysql 初始化失败")
+	//		}
+	//		pt := unsafe.Pointer(db)
+	//
+	//		atomic.StorePointer(&pt, unsafe.Pointer(newdb))
+	//
+	//	})
+	//	//要用原子操作
+	//	//pt := unsafe.Pointer(&db)
+	//	//val :=atomic.LoadPointer(&pt)
+	//	//return (*gorm.DB)(val)
+	//	return db
+	//})
 	err = dao.InitTable(db)
 	if err != nil {
 		panic(err)
