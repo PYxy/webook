@@ -19,15 +19,20 @@ import (
 var _ handler = (*ArticleHandler)(nil)
 
 type ArticleHandler struct {
-	svc service.ArticleService
-	l   logger2.LoggerV1
+	svc     service.ArticleService
+	l       logger2.LoggerV1
+	intrSvc service.InteractiveService
+	biz     string
 }
 
 func NewArticleHandler(svc service.ArticleService,
+	intrSvc service.InteractiveService,
 	l logger2.LoggerV1) *ArticleHandler {
 	return &ArticleHandler{
-		svc: svc,
-		l:   l,
+		svc:     svc,
+		intrSvc: intrSvc,
+		l:       l,
+		biz:     "article",
 	}
 }
 
@@ -50,7 +55,19 @@ func (h *ArticleHandler) RegisterPrivateRoutes(server *gin.Engine) {
 	g.POST("/withdraw", h.Withdraw)
 	pub := g.Group("/pub")
 	//pub.GET("/pub", a.PubList)
-	pub.GET("/:id", h.PubDetail)
+	pub.GET("/:id", h.PubDetail, func(ctx *gin.Context) {
+		// 增加阅读计数。
+		//go func() {
+		//	// 开一个 goroutine，异步去执行
+		//	er := a.intrSvc.IncrReadCnt(ctx, a.biz, art.Id)
+		//	if er != nil {
+		//		a.l.Error("增加阅读计数失败",
+		//			logger.Int64("aid", art.Id),
+		//			logger.Error(err))
+		//	}
+		//}()
+	})
+	pub.POST("/like", logger3.WrapReq[LikeReq](h.Like))
 }
 
 func (h *ArticleHandler) Publish(ctx *gin.Context) {
@@ -153,7 +170,52 @@ func (h *ArticleHandler) Withdraw(ctx *gin.Context) {
 }
 
 func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
+	idstr := ctx.Param("id")
+	id, err := strconv.ParseInt(idstr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "参数错误",
+		})
+		h.l.Error("前端输入的 ID 不对", logger2.Error(err))
+		return
+	}
+	art, err := h.svc.GetPublishedById(ctx, id)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		h.l.Error("获得文章信息失败", logger2.Error(err))
+		return
+	}
+	//增加阅读计数 现在的做法是不是:只要redis 里面有才会更新redis 没有就不更新(只更新数据库) 等到有人读那个阅读数再加到redis里面
+	// 增加阅读计数。
+	go func() {
+		// 开一个 goroutine，异步去执行
+		er := h.intrSvc.IncrReadCnt(ctx, h.biz, art.Id)
+		if er != nil {
+			h.l.Error("增加阅读计数失败",
+				logger2.Int64("aid", art.Id),
+				logger2.Error(err))
+		}
+	}()
 
+	// ctx.Set("art", art)
+
+	// 这个功能是不是可以让前端，主动发一个 HTTP 请求，来增加一个计数？
+	ctx.JSON(http.StatusOK, Result{
+		Data: ArticleVO{
+			Id:      art.Id,
+			Title:   art.Title,
+			Status:  art.Status.ToUint8(),
+			Content: art.Content,
+			// 要把作者信息带出去
+			Author: art.Author.Name,
+			Ctime:  art.Ctime.Format(time.DateTime),
+			Utime:  art.Utime.Format(time.DateTime),
+		},
+	})
 }
 
 func (h *ArticleHandler) List(ctx *gin.Context, req ListReq, uc *jwt.UserClaims) (logger3.Result, error) {
@@ -223,4 +285,21 @@ func (h *ArticleHandler) Detail(ctx *gin.Context, usr jwt.UserClaims) (logger3.R
 			Utime: art.Utime.Format(time.DateTime),
 		},
 	}, nil
+}
+
+func (h *ArticleHandler) Like(ctx *gin.Context, request LikeReq, uc *jwt.UserClaims) (logger3.Result, error) {
+	var err error
+	if request.Like {
+		err = h.intrSvc.Like(ctx, h.biz, request.Id, uc.Uid)
+	} else {
+		err = h.intrSvc.CancelLike(ctx, h.biz, request.Id, uc.Uid)
+	}
+
+	if err != nil {
+		return logger3.Result{
+			Code: 5,
+			Msg:  "系统错误",
+		}, err
+	}
+	return logger3.Result{Msg: "OK"}, nil
 }

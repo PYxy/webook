@@ -32,6 +32,12 @@ type ArticleReq struct {
 	Content string `json:"content"`
 }
 
+type LikeReq struct {
+	Id int64 `json:"id"`
+	// 点赞和取消点赞，我都准备复用这个
+	Like bool `json:"like"`
+}
+
 func (req ArticleReq) toDomain(uid int64) domain.Article {
 	return domain.Article{
 		Id:      req.Id,
