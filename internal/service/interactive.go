@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 
+	"golang.org/x/sync/errgroup"
+
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
 	"gitee.com/geekbang/basic-go/webook/internal/repository"
 	"gitee.com/geekbang/basic-go/webook/pkg/logger"
@@ -30,7 +32,38 @@ func (i *interactiveService) IncrReadCnt(ctx context.Context, biz string, bizId 
 
 func (i *interactiveService) Get(
 	ctx context.Context, biz string, bizId, uid int64) (domain.Interactive, error) {
-	panic("implement me")
+	// 按照 repository 的语义(完成 domain.Interactive 的完整构造)，你这里拿到的就应该是包含全部字段的
+	var (
+		eg        errgroup.Group
+		intr      domain.Interactive
+		liked     bool
+		collected bool
+	)
+	eg.Go(func() error {
+		var err error
+		intr, err = i.repo.Get(ctx, biz, bizId)
+		return err
+	})
+	//判断当前用户是否有点赞
+	eg.Go(func() error {
+		var err error
+		liked, err = i.repo.Liked(ctx, biz, bizId, uid)
+		return err
+	})
+	//判断当前用户是否有收藏
+	eg.Go(func() error {
+		var err error
+		collected, err = i.repo.Collected(ctx, biz, bizId, uid)
+		return err
+	})
+	err := eg.Wait()
+	if err != nil {
+		return domain.Interactive{}, err
+	}
+	intr.Liked = liked
+	intr.Collected = collected
+	return intr, nil
+
 }
 
 func (i *interactiveService) Like(ctx context.Context, biz string, bizId int64, uid int64) error {
@@ -45,7 +78,9 @@ func (i *interactiveService) CancelLike(ctx context.Context, biz string, bizId i
 // Collect 收藏
 func (i *interactiveService) Collect(ctx context.Context,
 	biz string, bizId, cid, uid int64) error {
-	panic("implement me")
+	// service 还叫做收藏
+	// repository
+	return i.repo.AddCollectionItem(ctx, biz, bizId, cid, uid)
 }
 
 func NewInteractiveService(repo repository.InteractiveRepository,

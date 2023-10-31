@@ -8,6 +8,8 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+var ErrRecordNotFound = gorm.ErrRecordNotFound
+
 //go:generate mockgen -source=./interactive.go -package=daomocks -destination=mocks/interactive.mock.go InteractiveDAO
 type InteractiveDAO interface {
 	IncrReadCnt(ctx context.Context, biz string, bizId int64) error
@@ -229,7 +231,6 @@ type Interactive struct {
 //	InteractiveV1 要想读操作友好一点 的话 可以 第一次插入的时候 一次性写入3条数据  尽可能保证3个数据在同一个页(或者区里面),利用mysql 的预读功能
 //
 // Interactive 对读更加友好
-//
 type InteractiveV1 struct {
 	Id    int64 `gorm:"primaryKey,autoIncrement"`
 	BizId int64

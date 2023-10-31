@@ -55,7 +55,8 @@ type RedisInteractiveCache struct {
 
 func (r *RedisInteractiveCache) IncrCollectCntIfPresent(ctx context.Context,
 	biz string, bizId int64) error {
-	panic("implement me")
+	return r.client.Eval(ctx, luaIncrCnt, []string{r.key(biz, bizId),
+		fieldCollectCnt}, 1).Err()
 }
 
 func (r *RedisInteractiveCache) IncrReadCntIfPresent(ctx context.Context,
@@ -120,6 +121,7 @@ func (r *RedisInteractiveCache) Get(ctx context.Context,
 }
 
 func (r *RedisInteractiveCache) Set(ctx context.Context, biz string, bizId int64, intr domain.Interactive) error {
+	//这里只缓存通用部分的
 	key := r.key(biz, bizId)
 	err := r.client.HMSet(ctx, key,
 		fieldLikeCnt, intr.LikeCnt,

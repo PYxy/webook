@@ -8,6 +8,7 @@ import (
 
 	"github.com/ecodeclub/ekit/slice"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
 	"gitee.com/geekbang/basic-go/webook/internal/service"
@@ -180,13 +181,44 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 		h.l.Error("前端输入的 ID 不对", logger2.Error(err))
 		return
 	}
-	art, err := h.svc.GetPublishedById(ctx, id)
+	var eg errgroup.Group
+	var art domain.Article
+	// 获取帖子的详细信息
+	eg.Go(func() error {
+
+		art, err = h.svc.GetPublishedById(ctx, id)
+		//if err != nil {
+		//	ctx.JSON(http.StatusOK, Result{
+		//		Code: 5,
+		//		Msg:  "系统错误",
+		//	})
+		//	h.l.Error("获得文章信息失败", logger2.Error(err))
+		//	return
+		//}
+		return err
+	})
+	var intr domain.Interactive
+	//查询文件的阅读数 收藏数 点赞数之类的
+	eg.Go(func() error {
+		// 要在这里获得这篇文章的计数
+		uc := ctx.MustGet("claims").(*LUserClaims)
+		// 这个地方可以容忍错误
+		intr, err = h.intrSvc.Get(ctx, h.biz, id, uc.Uid)
+		// 这种是容错的写法
+		//if err != nil {
+		//	// 记录日志
+		//}
+		//return nil
+		return err
+	})
+	// 在这儿等，要保证前面两个
+	err = eg.Wait()
 	if err != nil {
+		// 代表查询出错了
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
-		h.l.Error("获得文章信息失败", logger2.Error(err))
 		return
 	}
 	//增加阅读计数 现在的做法是不是:只要redis 里面有才会更新redis 没有就不更新(只更新数据库) 等到有人读那个阅读数再加到redis里面
@@ -211,9 +243,14 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 			Status:  art.Status.ToUint8(),
 			Content: art.Content,
 			// 要把作者信息带出去
-			Author: art.Author.Name,
-			Ctime:  art.Ctime.Format(time.DateTime),
-			Utime:  art.Utime.Format(time.DateTime),
+			Author:     art.Author.Name,
+			Ctime:      art.Ctime.Format(time.DateTime),
+			Utime:      art.Utime.Format(time.DateTime),
+			Liked:      intr.Liked,
+			Collected:  intr.Collected,
+			LikeCnt:    intr.LikeCnt,
+			ReadCnt:    intr.ReadCnt,
+			CollectCnt: intr.CollectCnt,
 		},
 	})
 }
