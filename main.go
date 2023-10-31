@@ -14,6 +14,7 @@ import (
 	_ "github.com/spf13/viper/remote"
 	glogger "gorm.io/gorm/logger"
 
+	"gitee.com/geekbang/basic-go/webook/internal/repository/cache"
 	"gitee.com/geekbang/basic-go/webook/internal/repository/dao/article"
 	local2 "gitee.com/geekbang/basic-go/webook/internal/service/sms/local"
 	logger2 "gitee.com/geekbang/basic-go/webook/pkg/logger"
@@ -260,11 +261,17 @@ func initUser(db *gorm.DB, cache v9.Cmdable, jwtHandler jwt.Handler) *web.UserHa
 }
 
 func initArticle(db *gorm.DB,
-	l logger2.LoggerV1) *web.ArticleHandler {
+	l logger2.LoggerV1,
+	cmd v9.Cmdable) *web.ArticleHandler {
 	gormDao := article.NewGORMArticleDAO(db)
 	repo := repository.NewArticleRepository(gormDao, l)
 	svc := service.NewArticleService(repo, l)
-	return web.NewArticleHandler(svc, l)
+
+	intrDao := dao.NewGORMInteractiveDAO(db)
+	intrCache := cache.NewRedisInteractiveCache(cmd) //redis对象
+	intrRepo := repository.NewCachedInteractiveRepository(intrDao, intrCache, l)
+	intrSvc := service.NewInteractiveService(intrRepo, l)
+	return web.NewArticleHandler(svc, intrSvc, l)
 }
 
 func initDB(logger logger2.LoggerV1) (*gorm.DB, v9.Cmdable) {
