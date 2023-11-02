@@ -121,3 +121,7 @@ type JSONEncoder struct {
 //func (s JSONEncoder) Length() int {
 //	return len(s)
 //}
+
+//模拟消费者
+//go install github,com/IBM/sarama/tools/kafka-console-producer@latest
+//kafka-console-consumer -topic=test_topic -brokers=localhost:9094
