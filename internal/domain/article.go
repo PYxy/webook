@@ -46,3 +46,17 @@ type Author struct {
 	Id   int64
 	Name string
 }
+
+//3 表名映射
+//复数表名，比如结构体 User，默认的表名为 users。会缓存表名。
+//
+//实现 Tabler 接口 （TableName 不支持动态变化，它会被缓存下来以便后续使用。）
+//
+//type Tabler interface {
+//	TableName() string
+//}
+//
+//// TableName 会将 User 的表名重写为 `profiles`
+//func (User) TableName() string {
+//	return "profiles"
+//}

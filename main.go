@@ -67,7 +67,7 @@ func main() {
 	l := logger2.NewNoOpLogger()
 	jwtHandler := jwt.NewRedisJWTHandler(cache)
 	user := initUser(db, cache, jwtHandler)
-	a := initArticle(db, l)
+	a := initArticle(db, l, nil)
 	//中间件绑定以及路由注册
 	server := initWebServer(jwtHandler, user, a)
 	// 初始化 UserHandle
