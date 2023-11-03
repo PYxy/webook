@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/ecodeclub/ekit/slice"
 	"gorm.io/gorm"
@@ -41,8 +42,8 @@ type ArticleReaderRepository interface {
 
 type CachedArticleRepository struct {
 	// 操作单一的库
-	dao article.ArticleDAO
-
+	dao      article.ArticleDAO
+	userRepo UserRepository
 	// SyncV1 用
 	authorDAO article.ArticleAuthorDAO
 	readerDAO article.ArticleReaderDAO
@@ -121,7 +122,26 @@ func (c *CachedArticleRepository) GetById(ctx context.Context, id int64) (domain
 
 func (c *CachedArticleRepository) GetPublishedById(ctx context.Context, id int64) (domain.Article, error) {
 	//TODO implement me
-	panic("implement me")
+	pubArt, err := c.dao.GetPubById(ctx, id)
+	if err != nil {
+		return domain.Article{}, err
+	}
+	user, err := c.userRepo.FindById(ctx, id)
+	if err != nil {
+		return domain.Article{}, err
+	}
+	return domain.Article{
+		Id:      pubArt.Id,
+		Title:   pubArt.Title,
+		Content: pubArt.Content,
+		Status:  domain.ArticleStatus(pubArt.Status),
+		Author: domain.Author{
+			Id:   user.Id,
+			Name: user.NickName,
+		},
+		Ctime: time.UnixMilli(pubArt.Ctime),
+		Utime: time.UnixMilli(pubArt.Utime),
+	}, nil
 }
 
 func (c *CachedArticleRepository) Create(ctx context.Context, art domain.Article) (int64, error) {
