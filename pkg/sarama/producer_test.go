@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/IBM/sarama"
@@ -8,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var addrs = []string{"xxxxx:9094"}
+var addrs = []string{"120.132.118.90:9094"}
 
 // TestSyncProducer 同步提提交
 func TestSyncProducer(t *testing.T) {
@@ -44,7 +45,8 @@ func TestSyncProducer(t *testing.T) {
 	assert.NoError(t, err)
 	_, _, err = producer.SendMessage(&sarama.ProducerMessage{
 		Topic: "test_topic",
-		Key:   sarama.StringEncoder("oid-123"),
+		//hash的话以这个来判断分区
+		//Key: sarama.StringEncoder("oid-124"),
 		// 消息数据本体
 		// 转 JSON
 		// protobuf
@@ -71,13 +73,14 @@ func TestAsyncProducer(t *testing.T) {
 	producer, err := sarama.NewAsyncProducer(addrs, cfg)
 	require.NoError(t, err)
 	msgCh := producer.Input()
-
+	var n int
 	go func() {
 		for {
+
 			msg := &sarama.ProducerMessage{
 				Topic: "test_topic",
 				Key:   sarama.StringEncoder("oid-123"),
-				Value: sarama.StringEncoder("Hello, 这是一条消息 A"),
+				Value: sarama.StringEncoder(fmt.Sprintf("Hello, 这是一条消息 %v", n)),
 				Headers: []sarama.RecordHeader{
 					{
 						Key:   []byte("trace_id"),
@@ -86,6 +89,7 @@ func TestAsyncProducer(t *testing.T) {
 				},
 				Metadata: "这是metadata",
 			}
+			n += 1
 			select {
 			case msgCh <- msg:
 				//default:
@@ -123,5 +127,22 @@ type JSONEncoder struct {
 //}
 
 //模拟消费者
-//go install github,com/IBM/sarama/tools/kafka-console-producer@latest
+//工具安装
+//https://github.com/IBM/sarama/tree/main/tools
+//go install github.com/IBM/sarama/tools/kafka-console-producer@latest
+//go install github.com/IBM/sarama/tools/kafka-console-consumer
 //kafka-console-consumer -topic=test_topic -brokers=localhost:9094
+
+//容器内部操作
+/*
+I have no name!@ca09011828c6:/opt/bitnami/kafka/bin$ ./kafka-topics.sh -bootstrap-server 127.0.0.1:9092 --list
+test_topic
+I have no name!@ca09011828c6:/opt/bitnami/kafka/bin$ pwd
+/opt/bitnami/kafka/bin
+I have no name!@ca09011828c6:/opt/bitnami/kafka/bin$ ./kafka-con
+kafka-configs.sh             kafka-console-consumer.sh    kafka-console-producer.sh    kafka-consumer-groups.sh     kafka-consumer-perf-test.sh
+I have no name!@ca09011828c6:/opt/bitnami/kafka/bin$ ./kafka-con
+kafka-configs.sh             kafka-console-consumer.sh    kafka-console-producer.sh    kafka-consumer-groups.sh     kafka-consumer-perf-test.sh
+I have no name!@ca09011828c6:/opt/bitnami/kafka/bin$ ./kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9092 --topic test_topic
+
+*/

@@ -4,7 +4,7 @@ go 1.21.1
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
-	github.com/IBM/sarama v1.41.3
+	github.com/IBM/sarama v1.42.0
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.587
 	github.com/aws/aws-sdk-go v1.46.1
 	github.com/bwmarrin/snowflake v0.3.0
