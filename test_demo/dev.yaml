@@ -4,7 +4,9 @@ db.mysql:
 redis:
   dsn: "webook-redis-service:6380"
 
-
+kafka:
+  addrs:
+    - "localhost:9094"
 
 
 

@@ -14,9 +14,11 @@ import (
 	_ "github.com/spf13/viper/remote"
 	glogger "gorm.io/gorm/logger"
 
+	article2 "gitee.com/geekbang/basic-go/webook/internal/events/article"
 	"gitee.com/geekbang/basic-go/webook/internal/repository/cache"
 	"gitee.com/geekbang/basic-go/webook/internal/repository/dao/article"
 	local2 "gitee.com/geekbang/basic-go/webook/internal/service/sms/local"
+	"gitee.com/geekbang/basic-go/webook/ioc"
 	logger2 "gitee.com/geekbang/basic-go/webook/pkg/logger"
 
 	"github.com/gin-contrib/cors"
@@ -265,12 +267,30 @@ func initArticle(db *gorm.DB,
 	cmd v9.Cmdable) *web.ArticleHandler {
 	gormDao := article.NewGORMArticleDAO(db)
 	repo := repository.NewArticleRepository(gormDao, l)
-	svc := service.NewArticleService(repo, l)
+
+	//kafka  生产者创建
+	client := ioc.InitKafka()
+	syncProducer := ioc.NewSyncProducer(client)
+	producer := article2.NewKafkaProducer(syncProducer)
+
+	svc := service.NewArticleService(repo, l, producer)
 
 	intrDao := dao.NewGORMInteractiveDAO(db)
 	intrCache := cache.NewRedisInteractiveCache(cmd) //redis对象
 	intrRepo := repository.NewCachedInteractiveRepository(intrDao, intrCache, l)
 	intrSvc := service.NewInteractiveService(intrRepo, l)
+	//这个应该是要繁杂外面的
+	//消费者
+	interactiveReadEventConsumer := article2.NewInteractiveReadEventConsumer(client, l, intrRepo)
+	v2 := ioc.NewConsumers(interactiveReadEventConsumer)
+
+	for _, c := range v2 {
+		err := c.Start()
+		if err != nil {
+			panic("消费者启动失败")
+		}
+	}
+	//这里应该把Article service 中的 Interactive 操作尽量移到kafka 中 的消费者去操作的
 	return web.NewArticleHandler(svc, intrSvc, l)
 }
 

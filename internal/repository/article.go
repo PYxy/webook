@@ -122,11 +122,13 @@ func (c *CachedArticleRepository) GetById(ctx context.Context, id int64) (domain
 
 func (c *CachedArticleRepository) GetPublishedById(ctx context.Context, id int64) (domain.Article, error) {
 	//TODO implement me
+	//获取文章信息
 	pubArt, err := c.dao.GetPubById(ctx, id)
 	if err != nil {
 		return domain.Article{}, err
 	}
-	user, err := c.userRepo.FindById(ctx, id)
+	//获取文章对应的用户信息
+	user, err := c.userRepo.FindById(ctx, pubArt.AuthorId)
 	if err != nil {
 		return domain.Article{}, err
 	}

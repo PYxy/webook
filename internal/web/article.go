@@ -181,12 +181,13 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 		h.l.Error("前端输入的 ID 不对", logger2.Error(err))
 		return
 	}
+	uc := ctx.MustGet("claims").(*LUserClaims)
 	var eg errgroup.Group
 	var art domain.Article
 	// 获取帖子的详细信息
 	eg.Go(func() error {
 
-		art, err = h.svc.GetPublishedById(ctx, id)
+		art, err = h.svc.GetPublishedById(ctx, id, uc.Uid)
 		//if err != nil {
 		//	ctx.JSON(http.StatusOK, Result{
 		//		Code: 5,

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
+	"gitee.com/geekbang/basic-go/webook/internal/events/article"
 	"gitee.com/geekbang/basic-go/webook/internal/repository"
 	"gitee.com/geekbang/basic-go/webook/pkg/logger"
 )
@@ -21,7 +22,7 @@ type ArticleService interface {
 	// GetPublishedById 查找已经发表的
 	// 剩下的这个是给读者用的服务，暂时放到这里
 	// 正常来说在微服务架构下，读者服务和创作者服务会是两个独立的服务
-	GetPublishedById(ctx context.Context, id int64) (domain.Article, error)
+	GetPublishedById(ctx context.Context, id int64, uid int64) (domain.Article, error)
 }
 
 type articleService struct {
@@ -32,7 +33,8 @@ type articleService struct {
 	// 2. 在 repo 里面处理制作库和线上库
 	repo repository.ArticleRepository
 
-	l logger.LoggerV1
+	l        logger.LoggerV1
+	producer article.Producer
 }
 
 func (a *articleService) Withdraw(ctx context.Context, uid, id int64) error {
@@ -50,8 +52,21 @@ func (a *articleService) GetById(ctx context.Context, id int64) (domain.Article,
 	return a.repo.GetByID(ctx, id)
 }
 
-func (a *articleService) GetPublishedById(ctx context.Context, id int64) (domain.Article, error) {
-	a.repo.GetPublishedById(ctx, id)
+func (a *articleService) GetPublishedById(ctx context.Context, id, uid int64) (domain.Article, error) {
+
+	art, err := a.repo.GetPublishedById(ctx, id)
+	if err == nil {
+		go func() {
+			er := a.producer.ProduceReadEvent(ctx, article.ReadEvent{
+				Uid: uid,
+				Aid: id,
+			})
+			if er != nil {
+				a.l.Error("发送读者阅读事件失败")
+			}
+		}()
+	}
+	return art, err
 }
 
 func (a *articleService) Publish(ctx context.Context, art domain.Article) (int64, error) {
@@ -96,10 +111,11 @@ func (a *articleService) PublishV1(ctx context.Context, art domain.Article) (int
 	return id, err
 }
 
-func NewArticleService(repo repository.ArticleRepository, l logger.LoggerV1) ArticleService {
+func NewArticleService(repo repository.ArticleRepository, l logger.LoggerV1, producer article.Producer) ArticleService {
 	return &articleService{
-		repo: repo,
-		l:    l,
+		repo:     repo,
+		l:        l,
+		producer: producer,
 	}
 }
 
