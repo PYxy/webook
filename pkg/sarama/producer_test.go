@@ -44,13 +44,13 @@ func TestSyncProducer(t *testing.T) {
 	producer, err := sarama.NewSyncProducer(addrs, cfg)
 	assert.NoError(t, err)
 	_, _, err = producer.SendMessage(&sarama.ProducerMessage{
-		Topic: "test_topic",
+		Topic: "ljy",
 		//hash的话以这个来判断分区
-		//Key: sarama.StringEncoder("oid-124"),
+		Key: sarama.StringEncoder("oid-124"),
 		// 消息数据本体
 		// 转 JSON
 		// protobuf
-		Value: sarama.StringEncoder("Hello, 这是一条消息 A"),
+		Value: sarama.StringEncoder("这是分区1的数据"),
 		// 会在生产者和消费者之间传递
 		Headers: []sarama.RecordHeader{
 			{

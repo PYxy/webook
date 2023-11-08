@@ -3,6 +3,7 @@ package sarama
 import (
 	"context"
 	"log"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,9 +31,17 @@ func TestConsumer(t *testing.T) {
 	time.AfterFunc(time.Second*30, func() {
 		cancel()
 	})
+	wg := sync.WaitGroup{}
+	//wg.Add(1)
+	//go func() {
+	//	defer wg.Done()
+	//	err = consumer.Consume(ctx,
+	//		[]string{"ljy"}, testConsumerGroupHandler{})
+	//}()
 	err = consumer.Consume(ctx,
-		[]string{"test_topic"}, testConsumerGroupHandler{})
+		[]string{"example"}, testConsumerGroupHandler{})
 	// 你消费结束，就会到这里
+	wg.Wait()
 	t.Log(err, time.Since(start).String())
 }
 
@@ -67,7 +76,7 @@ func (t testConsumerGroupHandler) Cleanup(session sarama.ConsumerGroupSession) e
 }
 
 func (t testConsumerGroupHandler) ConsumeClaim(
-// 代表的是你和Kafka 的会话（从建立连接到连接彻底断掉的那一段时间）
+	// 代表的是你和Kafka 的会话（从建立连接到连接彻底断掉的那一段时间）
 	session sarama.ConsumerGroupSession,
 	claim sarama.ConsumerGroupClaim) error {
 	msgs := claim.Messages()
@@ -132,7 +141,7 @@ func (t testConsumerGroupHandler) ConsumeClaim(
 }
 
 func (t testConsumerGroupHandler) ConsumeClaimV1(
-// 代表的是你和Kafka 的会话（从建立连接到连接彻底断掉的那一段时间）
+	// 代表的是你和Kafka 的会话（从建立连接到连接彻底断掉的那一段时间）
 	session sarama.ConsumerGroupSession,
 	claim sarama.ConsumerGroupClaim) error {
 	msgs := claim.Messages()
@@ -301,5 +310,24 @@ Hello, 这是一条消息 A
 Hello, 这是一条消息 A
 Hello, 这是一条消息 A
 Hello, 这是一条消息 A
+
+
+#查看消费者组有那些
+@bb9b8f0ccffc:/opt/bitnami/kafka/bin$ ./kafka-consumer-groups.sh --bootstrap-server 127.0.0.1:9092 --list
+test_group1
+t99
+test_group
+
+#消费者组的消费情况
+@bb9b8f0ccffc:/opt/bitnami/kafka/bin$ ./kafka-consumer-groups.sh -bootstrap-server 127.0.0.1:9092 --group test_group --describe
+
+Consumer group 'test_group' has no active members.
+
+GROUP           TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID     HOST            CLIENT-ID
+test_group      test_topic      0          39833           39834           1               -               -               -
+test_group      ljy             0          5               5               0               -               -               -
+test_group      ljy             1          2               2               0               -               -               -
+test_group      ljy             2          0               0               0               -               -               -
+
 
 */

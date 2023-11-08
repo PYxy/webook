@@ -24,7 +24,7 @@ func Test_KafkaConsumer(t *testing.T) {
 		panic(err)
 	}
 	// get partitionId list
-	partitions, err := consumer.Partitions("test_topic")
+	partitions, err := consumer.Partitions("ljy")
 	if err != nil {
 		panic(err)
 	}
