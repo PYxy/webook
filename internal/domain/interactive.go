@@ -10,3 +10,17 @@ type Interactive struct {
 	Liked     bool `json:"liked"`
 	Collected bool `json:"collected"`
 }
+
+// 记录 TOP N 的数据
+type TopInteractive struct {
+	Id    int64 `json:"id"`
+	BizId int64 `json:"biz_id"`
+	// 我这里biz 用的是 string，有些公司枚举使用的是 int 类型
+	// 0-article
+	// 1- xxx
+	// 默认是 BLOB/TEXT 类型
+	Biz string `json:"biz"`
+	// 这个是阅读计数
+	ReadCnt int64 `json:"read_cnt"`
+	LikeCnt int64 `json:"like_cnt"`
+}

@@ -19,12 +19,26 @@ type InteractiveRepository interface {
 	Get(ctx context.Context, biz string, bizId int64) (domain.Interactive, error)
 	Liked(ctx context.Context, biz string, id int64, uid int64) (bool, error)
 	Collected(ctx context.Context, biz string, id int64, uid int64) (bool, error)
+	GetTopN(ctx context.Context) ([]domain.TopInteractive, error)
 }
 
 type CachedReadCntRepository struct {
 	cache cache.InteractiveCache
 	dao   dao.InteractiveDAO
 	l     logger.LoggerV1
+}
+
+func (c *CachedReadCntRepository) GetTopN(ctx context.Context) ([]domain.TopInteractive, error) {
+	res, err := c.dao.GetTopN(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var topInteractiveSlice []domain.TopInteractive
+	topInteractiveSlice = make([]domain.TopInteractive, 0, len(res))
+	for _, topInteractive := range res {
+		topInteractiveSlice = append(topInteractiveSlice, c.toTopDomain(topInteractive))
+	}
+	return topInteractiveSlice, nil
 }
 
 func (c *CachedReadCntRepository) Liked(ctx context.Context, biz string, id int64, uid int64) (bool, error) {
@@ -143,6 +157,16 @@ func (c *CachedReadCntRepository) toDomain(intr dao.Interactive) domain.Interact
 		LikeCnt:    intr.LikeCnt,
 		CollectCnt: intr.CollectCnt,
 		ReadCnt:    intr.ReadCnt,
+	}
+}
+
+func (c *CachedReadCntRepository) toTopDomain(intr dao.Interactive) domain.TopInteractive {
+	return domain.TopInteractive{
+		Id:      intr.Id,
+		BizId:   intr.BizId,
+		Biz:     intr.Biz,
+		ReadCnt: intr.ReadCnt,
+		LikeCnt: intr.LikeCnt,
 	}
 }
 

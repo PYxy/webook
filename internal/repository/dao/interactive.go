@@ -19,10 +19,20 @@ type InteractiveDAO interface {
 	Get(ctx context.Context, biz string, bizId int64) (Interactive, error)
 	InsertCollectionBiz(ctx context.Context, cb UserCollectionBiz) error
 	GetCollectionInfo(ctx context.Context, biz string, bizId, uid int64) (UserCollectionBiz, error)
+	GetTopN(ctx context.Context) ([]Interactive, error)
 }
 
 type GORMInteractiveDAO struct {
 	db *gorm.DB
+}
+
+func (dao *GORMInteractiveDAO) GetTopN(ctx context.Context) ([]Interactive, error) {
+	var result []Interactive
+	err := dao.db.Model(&Interactive{}).Find(&result).Select("id", "biz_id", "biz", "like_cnt").Order("like_cnt desc").Limit(100).Error
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (dao *GORMInteractiveDAO) GetLikeInfo(ctx context.Context, biz string, bizId, uid int64) (UserLikeBiz, error) {

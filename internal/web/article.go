@@ -38,7 +38,8 @@ func NewArticleHandler(svc service.ArticleService,
 }
 
 func (h *ArticleHandler) RegisterPublicRoutes(server *gin.Engine) {
-
+	g := server.Group("/articles")
+	g.GET("/topN", h.GetTop)
 }
 
 func (h *ArticleHandler) RegisterPrivateRoutes(server *gin.Engine) {
@@ -340,4 +341,14 @@ func (h *ArticleHandler) Like(ctx *gin.Context, request LikeReq, uc *jwt.UserCla
 		}, err
 	}
 	return logger3.Result{Msg: "OK"}, nil
+}
+
+func (h *ArticleHandler) GetTop(context *gin.Context) {
+
+	//直接获取排名
+
+	//然后根据 biz_id + biz 找到对应的帖子的作者以及详细内容
+
+	//响应到前端
+
 }
