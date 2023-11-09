@@ -20,12 +20,19 @@ type InteractiveRepository interface {
 	Liked(ctx context.Context, biz string, id int64, uid int64) (bool, error)
 	Collected(ctx context.Context, biz string, id int64, uid int64) (bool, error)
 	GetTopN(ctx context.Context) ([]domain.TopInteractive, error)
+	SetTopN(ctx context.Context, res []domain.TopInteractive) error
 }
 
 type CachedReadCntRepository struct {
 	cache cache.InteractiveCache
 	dao   dao.InteractiveDAO
 	l     logger.LoggerV1
+}
+
+func (c *CachedReadCntRepository) SetTopN(ctx context.Context, res []domain.TopInteractive) error {
+	//TODO implement me
+	return c.cache.SetTopN(ctx, res)
+
 }
 
 func (c *CachedReadCntRepository) GetTopN(ctx context.Context) ([]domain.TopInteractive, error) {

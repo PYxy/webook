@@ -5,7 +5,6 @@ import (
 	"github.com/spf13/viper"
 
 	"gitee.com/geekbang/basic-go/webook/internal/events"
-	"gitee.com/geekbang/basic-go/webook/internal/events/article"
 )
 
 func InitKafka() sarama.Client {
@@ -34,6 +33,7 @@ func NewSyncProducer(client sarama.Client) sarama.SyncProducer {
 	return res
 }
 
-func NewConsumers(c1 *article.InteractiveReadEventConsumer) []events.Consumer {
-	return []events.Consumer{c1}
+func NewConsumers(c1 ...events.Consumer) (res []events.Consumer) {
+	res = append(res, c1...)
+	return res
 }

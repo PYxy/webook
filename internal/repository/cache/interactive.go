@@ -38,6 +38,7 @@ type InteractiveCache interface {
 	// Get 查询缓存中数据
 	Get(ctx context.Context, biz string, bizId int64) (domain.Interactive, error)
 	Set(ctx context.Context, biz string, bizId int64, intr domain.Interactive) error
+	SetTopN(ctx context.Context, res []domain.TopInteractive) error
 }
 
 // 方案1
@@ -51,6 +52,19 @@ type InteractiveCache interface {
 type RedisInteractiveCache struct {
 	client     redis.Cmdable
 	expiration time.Duration
+}
+
+func (r *RedisInteractiveCache) SetTopN(ctx context.Context, res []domain.TopInteractive) error {
+	var zset []redis.Z
+	for _, topInteractive := range res {
+		zset = append(zset,
+			redis.Z{
+				Score:  float64(topInteractive.LikeCnt),
+				Member: fmt.Sprintf("%v:%v:%v", topInteractive.Id, topInteractive.Biz, topInteractive.BizId),
+			})
+	}
+	return r.client.ZAdd(ctx, "like_top", zset...).Err()
+
 }
 
 func (r *RedisInteractiveCache) IncrCollectCntIfPresent(ctx context.Context,

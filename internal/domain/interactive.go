@@ -1,5 +1,7 @@
 package domain
 
+import "fmt"
+
 // Interactive 这个是总体交互的计数
 type Interactive struct {
 	ReadCnt    int64 `json:"read_cnt"`
@@ -23,4 +25,8 @@ type TopInteractive struct {
 	// 这个是阅读计数
 	ReadCnt int64 `json:"read_cnt"`
 	LikeCnt int64 `json:"like_cnt"`
+}
+
+func (t TopInteractive) Key() string {
+	return fmt.Sprintf("%v:%v:%v", t.Id, t.BizId, t.Biz)
 }

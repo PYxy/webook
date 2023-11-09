@@ -14,12 +14,14 @@ import (
 	_ "github.com/spf13/viper/remote"
 	glogger "gorm.io/gorm/logger"
 
+	"gitee.com/geekbang/basic-go/webook/internal/domain"
 	article2 "gitee.com/geekbang/basic-go/webook/internal/events/article"
 	"gitee.com/geekbang/basic-go/webook/internal/repository/cache"
 	"gitee.com/geekbang/basic-go/webook/internal/repository/dao/article"
 	local2 "gitee.com/geekbang/basic-go/webook/internal/service/sms/local"
 	"gitee.com/geekbang/basic-go/webook/ioc"
 	logger2 "gitee.com/geekbang/basic-go/webook/pkg/logger"
+	"gitee.com/geekbang/basic-go/webook/pkg/queue"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
@@ -69,9 +71,9 @@ func main() {
 	l := logger2.NewNoOpLogger()
 	jwtHandler := jwt.NewRedisJWTHandler(cache)
 	user := initUser(db, cache, jwtHandler)
-	a := initArticle(db, l, nil)
+	art := initArticle(db, l, cache)
 	//中间件绑定以及路由注册
-	server := initWebServer(jwtHandler, user, a)
+	server := initWebServer(jwtHandler, user, art)
 	// 初始化 UserHandle
 
 	server.Run(":8091")
@@ -280,10 +282,23 @@ func initArticle(db *gorm.DB,
 	intrRepo := repository.NewCachedInteractiveRepository(intrDao, intrCache, l)
 	intrSvc := service.NewInteractiveService(intrRepo, l)
 	//这个应该是要繁杂外面的
-	//消费者
-	interactiveReadEventConsumer := article2.NewInteractiveReadEventConsumer(client, l, intrRepo)
-	v2 := ioc.NewConsumers(interactiveReadEventConsumer)
 
+	//TOPN消费者
+	interactiveReadEventConsumer := article2.NewInteractiveReadEventConsumer(client, l, intrRepo)
+	queue := queue.NewPriorityQueue[domain.TopInteractive](-1, func(src domain.TopInteractive, dst domain.TopInteractive) int {
+		if src.LikeCnt < dst.LikeCnt {
+			return -1
+		} else if src.LikeCnt == dst.LikeCnt {
+			return 0
+		} else {
+			return 1
+		}
+	})
+
+	topNConsumer := article2.NewTopNConsumer(intrRepo, client, 10, l, queue)
+	v2 := ioc.NewConsumers(interactiveReadEventConsumer, topNConsumer)
+
+	//TopN
 	for _, c := range v2 {
 		err := c.Start()
 		if err != nil {
