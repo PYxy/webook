@@ -30,6 +30,7 @@ webook 服务启动
 1.使用接口查询
 ![img_2.png](img_2.png)
 {"code":200,"msg":"查询成功","data":[{"id":78,"biz_id":11,"biz":"et","read_cnt":0,"like_cnt":450},{"id":58,"biz_id":7,"biz":"wq3","read_cnt":0,"like_cnt":290},{"id":20,"biz_id":4,"biz":"c","read_cnt":0,"like_cnt":108},{"id":60,"biz_id":7,"biz":"rt","read_cnt":0,"like_cnt":98},{"id":72,"biz_id":8,"biz":"et","read_cnt":0,"like_cnt":80},{"id":56,"biz_id":7,"biz":"wq2","read_cnt":0,"like_cnt":80},{"id":62,"biz_id":7,"biz":"ry","read_cnt":0,"like_cnt":79},{"id":64,"biz_id":7,"biz":"ry2","read_cnt":0,"like_cnt":55},{"id":68,"biz_id":8,"biz":"a","read_cnt":0,"like_cnt":54},{"id":70,"biz_id":8,"biz":"b","read_cnt":0,"like_cnt":53}]}
+
 2.插入一条 非topN 的数据
 ![img_3.png](img_3.png)
 使用查询接口
