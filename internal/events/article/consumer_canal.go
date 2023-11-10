@@ -108,6 +108,7 @@ func (c *TopNConsumer) Consume(event []CANALEVENT) error {
 				//出头
 				_, _ = c.queue.Dequeue()
 				//从新排序
+				c.localDate[e.Key()] = e.ToDomain()
 				_ = c.queue.Enqueue(e.ToDomain())
 
 			}

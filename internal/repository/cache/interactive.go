@@ -71,7 +71,7 @@ func (r *RedisInteractiveCache) GetTopN(ctx context.Context, key string, top int
 	for _, val := range res {
 		str := val.Member.(string)
 		seps := strings.Split(str, ":")
-		fmt.Printf("id:%v biz_id:%v biz:%v score:%v  \n", seps[0], seps[1], seps[2], val.Score)
+		//fmt.Printf("id:%v biz_id:%v biz:%v score:%v  \n", seps[0], seps[1], seps[2], val.Score)
 		id, biz_id, biz, score := seps[0], seps[1], seps[2], val.Score
 		topInteractive = append(topInteractive, domain.TopInteractive{
 			Id:      gocast.Int64(id),

@@ -39,6 +39,8 @@ func (c *CachedReadCntRepository) SetTopN(ctx context.Context, key string, res [
 func (c *CachedReadCntRepository) GetTopN(ctx context.Context, key string, top int64) ([]domain.TopInteractive, error) {
 	//缓存查询
 	topInteractions, err := c.cache.GetTopN(ctx, key, top)
+	//fmt.Println(topInteractions)
+	//fmt.Println(err)
 	if err != nil && !errors.Is(err, cache.ErrKeyNotExist) {
 		return nil, err
 	}

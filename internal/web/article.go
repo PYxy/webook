@@ -358,14 +358,14 @@ func (h *ArticleHandler) GetTop(ctx *gin.Context) {
 		return
 	}
 	if top == "" {
-		topN = 9
+		topN = 10
 	} else {
 		topN = gocast.Int64(top)
 	}
 
 	//repo   repository.InteractiveRepository
 	//直接获取排名
-	interactives, err := h.intrSvc.GetTopN(ctx, key, topN)
+	interactives, err := h.intrSvc.GetTopN(ctx, key, topN-1)
 	if err != nil {
 		h.l.Error("查询topN 失败")
 		ctx.JSON(http.StatusOK, Result{
