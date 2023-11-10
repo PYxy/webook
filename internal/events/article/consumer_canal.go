@@ -41,28 +41,34 @@ type TopNConsumer struct {
 	repo      repository.InteractiveRepository
 	count     int64
 	localDate map[string]domain.TopInteractive
-
-	l     logger.LoggerV1
-	queue *queue.PriorityQueue[domain.TopInteractive]
+	key       string
+	l         logger.LoggerV1
+	queue     *queue.PriorityQueue[domain.TopInteractive]
 }
 
 func (c *TopNConsumer) Consume(event []CANALEVENT) error {
 	fmt.Println("需要更新的事件:", event)
 	fmt.Println("原始数据1:", c.localDate)
+	var (
+		removekeys  []string
+		needToSort  bool
+		needToChang bool
+	)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	//要先判断 这个key 是不是已经在里面了
 	//处理CANALEVENT  这里其实是一个 切片更好
 	notExistEvent := make([]CANALEVENT, 0, 10)
-	var needToSort bool
+
 	for _, e := range event {
 		key := e.Key()
 		_, ok := c.localDate[key]
 		if !ok {
+			fmt.Println("不命中:", key)
 			notExistEvent = append(notExistEvent, e)
 			continue
 		}
-
+		fmt.Println("命中")
 		c.localDate[key] = e.ToDomain()
 		needToSort = true
 
@@ -86,25 +92,39 @@ func (c *TopNConsumer) Consume(event []CANALEVENT) error {
 		c.queue = newQueue
 
 	}
-
-	if len(notExistEvent) >= 0 {
+	//新增加的
+	if len(notExistEvent) > 0 {
+		removekeys = make([]string, 0, len(notExistEvent))
 		for _, e := range notExistEvent {
-			//直接拿第一个就好了
+			//直接拿第一个就好了,比他大 就出队 入队
+			//相等的情况 可能要按某个顺序排序 或者并列的情况
 			val, _ := c.queue.Peek()
-			if val.LikeCnt <= e.Like_cnt {
+			if val.LikeCnt < e.Like_cnt {
+				needToChang = true
 				//删除map 中的
-				delete(c.localDate, e.Key())
+				fmt.Println("需要删除key:", val.Key())
+				removekeys = append(removekeys, val.Key())
+				delete(c.localDate, val.Key())
 				//出头
 				_, _ = c.queue.Dequeue()
 				//从新排序
 				_ = c.queue.Enqueue(e.ToDomain())
+
 			}
 		}
 	}
+	if removekeys == nil {
+		removekeys = make([]string, 0, 0)
+	}
 
-	//return r.repo.IncrReadCnt(ctx, "article", t.Aid)
-	return c.repo.SetTopN(ctx, c.queue.RawData())
-	//直接在小顶推中操作元素  或者在上层做一个聚合操作
+	//避免多余的操作
+	if needToSort || needToChang {
+		//return r.repo.IncrReadCnt(ctx, "article", t.Aid)
+		return c.repo.SetTopN(ctx, "like_top", c.queue.RawData(), removekeys)
+
+	}
+
+	return nil
 }
 
 func (t TopNConsumer) Start() error {
@@ -115,7 +135,7 @@ func (t TopNConsumer) Start() error {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-	res, err := t.repo.GetTopN(ctx)
+	res, err := t.repo.GetTopN(ctx, t.key, t.count-1)
 	fmt.Println("查询到的结果：", res)
 	if err != nil {
 		panic(err)
@@ -128,7 +148,7 @@ func (t TopNConsumer) Start() error {
 
 	cancel()
 	ctx, cancel = context.WithTimeout(context.Background(), time.Second*2)
-	err = t.repo.SetTopN(ctx, res)
+	err = t.repo.SetTopN(ctx, "like_top", res, []string{})
 	if err != nil {
 		panic(fmt.Sprintf("设置top N(10)失败:%v", err))
 	}
@@ -148,11 +168,12 @@ func (t TopNConsumer) Start() error {
 	return err
 }
 
-func NewTopNConsumer(repo repository.InteractiveRepository, client sarama.Client, count int64, l logger.LoggerV1, data *queue.PriorityQueue[domain.TopInteractive]) *TopNConsumer {
+func NewTopNConsumer(repo repository.InteractiveRepository, key string, client sarama.Client, count int64, l logger.LoggerV1, data *queue.PriorityQueue[domain.TopInteractive]) *TopNConsumer {
 	return &TopNConsumer{
 		client:    client,
 		count:     count,
 		repo:      repo,
+		key:       key,
 		localDate: map[string]domain.TopInteractive{},
 		l:         l,
 		queue:     data,

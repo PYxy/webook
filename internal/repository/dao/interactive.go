@@ -28,7 +28,9 @@ type GORMInteractiveDAO struct {
 
 func (dao *GORMInteractiveDAO) GetTopN(ctx context.Context) ([]Interactive, error) {
 	var result []Interactive
-	err := dao.db.Model(&Interactive{}).Find(&result).Select("id", "biz_id", "biz", "like_cnt").Order("like_cnt desc").Limit(10).Error
+	//顺序一定要对
+	//find  一定要写在最后
+	err := dao.db.Model(&Interactive{}).Select("id", "biz_id", "biz", "like_cnt").Order("like_cnt desc").Limit(10).Find(&result).Error
 	if err != nil {
 		return nil, err
 	}

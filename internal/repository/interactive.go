@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
 	"gitee.com/geekbang/basic-go/webook/internal/repository/cache"
@@ -19,8 +20,8 @@ type InteractiveRepository interface {
 	Get(ctx context.Context, biz string, bizId int64) (domain.Interactive, error)
 	Liked(ctx context.Context, biz string, id int64, uid int64) (bool, error)
 	Collected(ctx context.Context, biz string, id int64, uid int64) (bool, error)
-	GetTopN(ctx context.Context) ([]domain.TopInteractive, error)
-	SetTopN(ctx context.Context, res []domain.TopInteractive) error
+	GetTopN(ctx context.Context, key string, top int64) ([]domain.TopInteractive, error)
+	SetTopN(ctx context.Context, key string, res []domain.TopInteractive, removeKeys []string) error
 }
 
 type CachedReadCntRepository struct {
@@ -29,13 +30,23 @@ type CachedReadCntRepository struct {
 	l     logger.LoggerV1
 }
 
-func (c *CachedReadCntRepository) SetTopN(ctx context.Context, res []domain.TopInteractive) error {
+func (c *CachedReadCntRepository) SetTopN(ctx context.Context, key string, res []domain.TopInteractive, removeKeys []string) error {
 	//TODO implement me
-	return c.cache.SetTopN(ctx, res)
+	return c.cache.SetTopN(ctx, key, res, removeKeys)
 
 }
 
-func (c *CachedReadCntRepository) GetTopN(ctx context.Context) ([]domain.TopInteractive, error) {
+func (c *CachedReadCntRepository) GetTopN(ctx context.Context, key string, top int64) ([]domain.TopInteractive, error) {
+	//缓存查询
+	topInteractions, err := c.cache.GetTopN(ctx, key, top)
+	if err != nil && !errors.Is(err, cache.ErrKeyNotExist) {
+		return nil, err
+	}
+	if err == nil {
+		return topInteractions, nil
+	}
+	//上面没有查找到(正常不会出现)  就查数据库
+
 	res, err := c.dao.GetTopN(ctx)
 	if err != nil {
 		return nil, err

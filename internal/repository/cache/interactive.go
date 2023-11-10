@@ -5,8 +5,10 @@ import (
 	_ "embed"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/demdxx/gocast/v2"
 	"github.com/redis/go-redis/v9"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
@@ -38,7 +40,8 @@ type InteractiveCache interface {
 	// Get 查询缓存中数据
 	Get(ctx context.Context, biz string, bizId int64) (domain.Interactive, error)
 	Set(ctx context.Context, biz string, bizId int64, intr domain.Interactive) error
-	SetTopN(ctx context.Context, res []domain.TopInteractive) error
+	SetTopN(ctx context.Context, key string, res []domain.TopInteractive, removeKeys []string) error
+	GetTopN(ctx context.Context, key string, top int64) ([]domain.TopInteractive, error)
 }
 
 // 方案1
@@ -54,16 +57,55 @@ type RedisInteractiveCache struct {
 	expiration time.Duration
 }
 
-func (r *RedisInteractiveCache) SetTopN(ctx context.Context, res []domain.TopInteractive) error {
+func (r *RedisInteractiveCache) GetTopN(ctx context.Context, key string, top int64) ([]domain.TopInteractive, error) {
+	//TODO implement me
+	res, err := r.client.ZRevRangeWithScores(ctx, key, 0, top).Result()
+	//即使key 不存在 也不会返回err
+	if err != nil {
+		return nil, err
+	}
+	if err == nil && len(res) == 0 {
+		return nil, ErrKeyNotExist
+	}
+	var topInteractive []domain.TopInteractive
+	for _, val := range res {
+		str := val.Member.(string)
+		seps := strings.Split(str, ":")
+		fmt.Printf("id:%v biz_id:%v biz:%v score:%v  \n", seps[0], seps[1], seps[2], val.Score)
+		id, biz_id, biz, score := seps[0], seps[1], seps[2], val.Score
+		topInteractive = append(topInteractive, domain.TopInteractive{
+			Id:      gocast.Int64(id),
+			BizId:   gocast.Int64(biz_id),
+			Biz:     biz,
+			ReadCnt: 0,
+			LikeCnt: gocast.Int64(score),
+		})
+		//fmt.Println(val),
+	}
+	return topInteractive, nil
+}
+
+func (r *RedisInteractiveCache) SetTopN(ctx context.Context, key string, res []domain.TopInteractive, removeKeys []string) error {
 	var zset []redis.Z
 	for _, topInteractive := range res {
 		zset = append(zset,
 			redis.Z{
 				Score:  float64(topInteractive.LikeCnt),
-				Member: fmt.Sprintf("%v:%v:%v", topInteractive.Id, topInteractive.Biz, topInteractive.BizId),
+				Member: fmt.Sprintf("%v:%v:%v", topInteractive.Id, topInteractive.BizId, topInteractive.Biz),
 			})
 	}
-	return r.client.ZAdd(ctx, "like_top", zset...).Err()
+	go func() {
+		fmt.Println("需要删除的keys:", removeKeys)
+		if len(removeKeys) != 0 {
+			//记录异常
+			ct, cancel := context.WithTimeout(context.Background(), time.Second*2)
+			defer func() {
+				cancel()
+			}()
+			fmt.Println("删除多余的key:", r.client.ZRem(ct, key, removeKeys).Err())
+		}
+	}()
+	return r.client.ZAdd(ctx, key, zset...).Err()
 
 }
 

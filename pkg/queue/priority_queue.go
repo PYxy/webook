@@ -121,7 +121,7 @@ func (p *PriorityQueue[T]) heapify(data []T, n, i int) {
 }
 
 func (p *PriorityQueue[T]) RawData() []T {
-	return p.data
+	return p.data[1:]
 }
 
 // NewPriorityQueue 创建优先队列 capacity <= 0 时，为无界队列，否则有有界队列

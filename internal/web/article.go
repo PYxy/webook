@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/demdxx/gocast/v2"
 	"github.com/ecodeclub/ekit/slice"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
@@ -39,7 +40,7 @@ func NewArticleHandler(svc service.ArticleService,
 
 func (h *ArticleHandler) RegisterPublicRoutes(server *gin.Engine) {
 	g := server.Group("/articles")
-	g.GET("/topN", h.GetTop)
+	g.GET("/topN/:key/:top", h.GetTop)
 }
 
 func (h *ArticleHandler) RegisterPrivateRoutes(server *gin.Engine) {
@@ -343,12 +344,45 @@ func (h *ArticleHandler) Like(ctx *gin.Context, request LikeReq, uc *jwt.UserCla
 	return logger3.Result{Msg: "OK"}, nil
 }
 
-func (h *ArticleHandler) GetTop(context *gin.Context) {
+func (h *ArticleHandler) GetTop(ctx *gin.Context) {
+	//可以前端参数传key
+	key := ctx.Param("key")
+	top := ctx.Param("top")
+	var topN int64
+	if key == "" {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "参数异常",
+			Data: nil,
+		})
+		return
+	}
+	if top == "" {
+		topN = 9
+	} else {
+		topN = gocast.Int64(top)
+	}
 
+	//repo   repository.InteractiveRepository
 	//直接获取排名
-
+	interactives, err := h.intrSvc.GetTopN(ctx, key, topN)
+	if err != nil {
+		h.l.Error("查询topN 失败")
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "查询失败",
+			Data: nil,
+		})
+		return
+	}
 	//然后根据 biz_id + biz 找到对应的帖子的作者以及详细内容
 
 	//响应到前端
-
+	h.l.Debug("查询成功")
+	ctx.JSON(http.StatusOK, Result{
+		Code: 200,
+		Msg:  "查询成功",
+		Data: interactives,
+	})
+	return
 }

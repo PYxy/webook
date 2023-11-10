@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	slog "log"
+	"os"
 	"strings"
 	"time"
 
@@ -12,7 +14,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	_ "github.com/spf13/viper/remote"
-	glogger "gorm.io/gorm/logger"
+	gl "gorm.io/gorm/logger"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
 	article2 "gitee.com/geekbang/basic-go/webook/internal/events/article"
@@ -68,10 +70,10 @@ func main() {
 	logger := InitLogger()
 	db, cache := initDB(logger)
 	//gin 服务初始化
-	l := logger2.NewNoOpLogger()
+	//l := logger2.NewNoOpLogger()
 	jwtHandler := jwt.NewRedisJWTHandler(cache)
 	user := initUser(db, cache, jwtHandler)
-	art := initArticle(db, l, cache)
+	art := initArticle(db, logger, cache)
 	//中间件绑定以及路由注册
 	server := initWebServer(jwtHandler, user, art)
 	// 初始化 UserHandle
@@ -285,7 +287,8 @@ func initArticle(db *gorm.DB,
 
 	//TOPN消费者
 	interactiveReadEventConsumer := article2.NewInteractiveReadEventConsumer(client, l, intrRepo)
-	queue := queue.NewPriorityQueue[domain.TopInteractive](-1, func(src domain.TopInteractive, dst domain.TopInteractive) int {
+	//有界
+	queue := queue.NewPriorityQueue[domain.TopInteractive](10, func(src domain.TopInteractive, dst domain.TopInteractive) int {
 		if src.LikeCnt < dst.LikeCnt {
 			return -1
 		} else if src.LikeCnt == dst.LikeCnt {
@@ -295,7 +298,7 @@ func initArticle(db *gorm.DB,
 		}
 	})
 
-	topNConsumer := article2.NewTopNConsumer(intrRepo, client, 10, l, queue)
+	topNConsumer := article2.NewTopNConsumer(intrRepo, "like_top", client, 10, l, queue)
 	v2 := ioc.NewConsumers(interactiveReadEventConsumer, topNConsumer)
 
 	//TopN
@@ -311,17 +314,31 @@ func initArticle(db *gorm.DB,
 
 func initDB(logger logger2.LoggerV1) (*gorm.DB, v9.Cmdable) {
 	//mysql 自定义打印日志
+	//db, err := gorm.Open(mysql.Open(fmt.Sprintf("%s?charset=utf8&timeout=4s", config.Config.DB.DSN)), &gorm.Config{
+	//	//需要一个logger glogger.New()
+	//	Logger: glogger.New(gormLoggerFunc(logger.Debug), glogger.Config{
+	//		//慢查询阈值
+	//		SlowThreshold: time.Millisecond * 10,
+	//		//是否忽略查找不到记录的异常
+	//		IgnoreRecordNotFoundError: true,
+	//		ParameterizedQueries:      true,
+	//		LogLevel:                  glogger.Info,
+	//	}),
+	//})
+
 	db, err := gorm.Open(mysql.Open(fmt.Sprintf("%s?charset=utf8&timeout=4s", config.Config.DB.DSN)), &gorm.Config{
 		//需要一个logger glogger.New()
-		Logger: glogger.New(gormLoggerFunc(logger.Debug), glogger.Config{
-			//慢查询阈值
-			SlowThreshold: time.Millisecond * 100,
-			//是否忽略查找不到记录的异常
-			IgnoreRecordNotFoundError: true,
-			ParameterizedQueries:      true,
-			LogLevel:                  glogger.Info,
-		}),
+		Logger: gl.New(
+			slog.New(os.Stdout, "\r\n", slog.LstdFlags), // io writer
+			gl.Config{
+				SlowThreshold: time.Second, // 慢查询 SQL 阈值
+				Colorful:      false,       // 禁用彩色打印
+				//IgnoreRecordNotFoundError: false,
+				LogLevel: gl.Info, // Log lever
+			},
+		),
 	})
+
 	if err != nil {
 		// 我只会在初始化过程中 panic
 		// panic 相当于整个 goroutine 结束
