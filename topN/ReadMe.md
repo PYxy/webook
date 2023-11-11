@@ -15,6 +15,32 @@
     1.整个流程只需要在启动的时候操作一次mysql,如果建立本地缓存+redis 订阅功能  可以不通过mysql 就可以获取到topN的数据  
 
 
+topN查询 流程
+
+1.查询优先redis 没有再查询mysql
+代码流程:都在webook/internal 文件夹中
+  文件名                            函数
+web/article.go                   func (h *ArticleHandler) GetTop(ctx *gin.Context)
+service/interactive.go           GetTopN(ctx *gin.Context, key string, top int64) ([]domain.TopInteractive, error)
+repository/interactive.go  	     GetTopN(ctx context.Context, key string, top int64) ([]domain.TopInteractive, error)
+走redis:
+repository/cache/interactive.go  GetTopN(ctx context.Context, key string, top int64) ([]domain.TopInteractive, error)
+走mysql
+repository/dao/interactive.go    GetTopN(ctx context.Context) ([]Interactive, error)
+
+
+SetN查询  将数据查询出来放在redis 中
+代码流程:都在webook/internal 文件夹中
+    文件名                            函数
+events/article/consumer_canal.go  func (t TopNConsumer) Start() error 服务启动的时候查询一次数据库
+repository/interactive.go         SetTopN(ctx context.Context, key string, res []domain.TopInteractive, removeKeys []string) error
+repository/cache/interactive.go   SetTopN(ctx context.Context, key string, res []domain.TopInteractive, removeKeys []string) error
+
+
+加个localcache  感觉比缓存再redis 好
+localcache 的过期时间 < redis 的过期时间
+各个节点直接使用redis(订阅功能) 或者 kafka 进行localcache 数据同步
+服务启动的时候 最好保证只有一个人 去mysql 中去查 其他节点等着读redis 或者 等消息订阅回来就好(分布式锁)
 ```
 
 
