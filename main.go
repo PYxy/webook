@@ -6,14 +6,23 @@ import (
 	"errors"
 	"fmt"
 	slog "log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/redis"
+	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	_ "github.com/spf13/viper/remote"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 	gl "gorm.io/gorm/logger"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
@@ -22,15 +31,9 @@ import (
 	"gitee.com/geekbang/basic-go/webook/internal/repository/dao/article"
 	local2 "gitee.com/geekbang/basic-go/webook/internal/service/sms/local"
 	"gitee.com/geekbang/basic-go/webook/ioc"
+	"gitee.com/geekbang/basic-go/webook/pkg/ginx/metric"
 	logger2 "gitee.com/geekbang/basic-go/webook/pkg/logger"
 	"gitee.com/geekbang/basic-go/webook/pkg/queue"
-
-	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/redis"
-	"github.com/gin-gonic/gin"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
 
 	v9 "github.com/redis/go-redis/v9"
 
@@ -55,6 +58,8 @@ PS F:\git_push\webook>  go build -ldflags '-s -w' -o t99 .\main.go
 */
 
 func main() {
+
+	endFunc := ioc.InitOTEL()
 	cfile := pflag.String("config", "F:\\git_push\\webook\\test_demo\\dev.yaml", "指定配置文件的路径")
 	pflag.Parse()
 
@@ -68,18 +73,25 @@ func main() {
 	viper.WatchConfig()
 	//TODO 数据库连接对象初始化
 	logger := InitLogger()
-	db, cache := initDB(logger)
+	//db, cache := initDB(logger)
+	db := ioc.InitMysql()
+	cache1 := ioc.InitRedis()
+
+	//初始化Prometheus 服务
+	initPrometheus()
 	//gin 服务初始化
 	//l := logger2.NewNoOpLogger()
-	jwtHandler := jwt.NewRedisJWTHandler(cache)
-	user := initUser(db, cache, jwtHandler)
-	art := initArticle(db, logger, cache)
+	jwtHandler := jwt.NewRedisJWTHandler(cache1)
+	user := initUser(db, cache1, jwtHandler)
+	art := initArticle(db, logger, cache1)
 	//中间件绑定以及路由注册
 	server := initWebServer(jwtHandler, user, art)
 	// 初始化 UserHandle
 
 	server.Run(":8091")
-
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	endFunc(ctx)
 }
 
 //func main2() {
@@ -156,6 +168,16 @@ func initLoggerv3() {
 func initWebServer(jwtHandler jwt.Handler, userhandler *web.UserHandler, articleHandler *web.ArticleHandler) *gin.Engine {
 	server := gin.Default()
 
+	//prometheus
+	server.Use(metric.MiddlewareBuilder{
+		Namespace:  "geekbang_daming",
+		Subsystem:  "webook",
+		Name:       "gin_http",
+		Help:       "统计 GIN 的 HTTP 接口",
+		InstanceID: "my-instance-1",
+	}.Build())
+	// 链路追踪
+	server.Use(otelgin.Middleware("webook"))
 	//TODO 通用中间件注册
 	server.Use(func(ctx *gin.Context) {
 		println("这是第一个 middleware")
@@ -227,6 +249,13 @@ func initWebServer(jwtHandler jwt.Handler, userhandler *web.UserHandler, article
 	//server1 := gin.Default()
 	//server1.Use(middleware.CheckLogin())
 	return server
+}
+
+func initPrometheus() {
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		http.ListenAndServe(":8088", nil)
+	}()
 }
 
 func initUser(db *gorm.DB, cache v9.Cmdable, jwtHandler jwt.Handler) *web.UserHandler {
