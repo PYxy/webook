@@ -10,6 +10,9 @@ import (
 
 	"github.com/demdxx/gocast/v2"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
 )
@@ -55,16 +58,26 @@ type InteractiveCache interface {
 type RedisInteractiveCache struct {
 	client     redis.Cmdable
 	expiration time.Duration
+	tracer     trace.Tracer
 }
 
 func (r *RedisInteractiveCache) GetTopN(ctx context.Context, key string, top int64) ([]domain.TopInteractive, error) {
 	//TODO implement me
-	res, err := r.client.ZRevRangeWithScores(ctx, key, 0, top).Result()
+	//trace.ContextWithSpan()
+	CtxSpen, span := r.tracer.Start(ctx, "redis-cache")
+	span.AddEvent("cache-event")
+	defer span.End()
+
+	res, err := r.client.ZRevRangeWithScores(CtxSpen, key, 0, top).Result()
+	//defer span.End()
 	//即使key 不存在 也不会返回err
 	if err != nil {
+		span.SetAttributes(attribute.String(key, err.Error()))
 		return nil, err
+
 	}
 	if err == nil && len(res) == 0 {
+		span.SetAttributes(attribute.String(key, "key 不存在"))
 		return nil, ErrKeyNotExist
 	}
 	var topInteractive []domain.TopInteractive
@@ -196,5 +209,6 @@ func (r *RedisInteractiveCache) key(biz string, bizId int64) string {
 func NewRedisInteractiveCache(client redis.Cmdable) InteractiveCache {
 	return &RedisInteractiveCache{
 		client: client,
+		tracer: otel.GetTracerProvider().Tracer("redis-cache"),
 	}
 }

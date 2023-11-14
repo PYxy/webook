@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
@@ -9,6 +10,9 @@ import (
 	"github.com/demdxx/gocast/v2"
 	"github.com/ecodeclub/ekit/slice"
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
@@ -24,6 +28,7 @@ type ArticleHandler struct {
 	svc     service.ArticleService
 	l       logger2.LoggerV1
 	intrSvc service.InteractiveService
+	tracer  trace.Tracer
 	biz     string
 }
 
@@ -35,6 +40,7 @@ func NewArticleHandler(svc service.ArticleService,
 		intrSvc: intrSvc,
 		l:       l,
 		biz:     "article",
+		tracer:  otel.GetTracerProvider().Tracer("artical-query"),
 	}
 }
 
@@ -346,8 +352,14 @@ func (h *ArticleHandler) Like(ctx *gin.Context, request LikeReq, uc *jwt.UserCla
 
 func (h *ArticleHandler) GetTop(ctx *gin.Context) {
 	//可以前端参数传key
+	//ctx.Request.Context()
+	spanCtx, span := h.tracer.Start(ctx.Request.Context(), "main")
+	//spanCtx, span := tracer.Start(ctx.Request.Context(), "main")
+	defer span.End()
+
 	key := ctx.Param("key")
 	top := ctx.Param("top")
+
 	var topN int64
 	if key == "" {
 		ctx.JSON(http.StatusOK, Result{
@@ -362,11 +374,14 @@ func (h *ArticleHandler) GetTop(ctx *gin.Context) {
 	} else {
 		topN = gocast.Int64(top)
 	}
-
+	//var ctx1 context.Context = ctx.Request.Context()
 	//repo   repository.InteractiveRepository
 	//直接获取排名
-	interactives, err := h.intrSvc.GetTopN(ctx, key, topN-1)
+
+	//最里面也有一层trace
+	interactives, err := h.intrSvc.GetTopN(spanCtx, key, topN-1)
 	if err != nil {
+		span.SetAttributes(attribute.String("topN", err.Error()))
 		h.l.Error("查询topN 失败")
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
@@ -375,6 +390,13 @@ func (h *ArticleHandler) GetTop(ctx *gin.Context) {
 		})
 		return
 	}
+	_, spanNew := h.tracer.Start(spanCtx, "response")
+	defer spanNew.End()
+	spanNew.AddEvent("回传http 数据")
+
+	GetRequest("http://127.0.0.1:8082/test1")
+
+	//trace.SpanFromContext()
 	//然后根据 biz_id + biz 找到对应的帖子的作者以及详细内容
 
 	//响应到前端
@@ -385,4 +407,19 @@ func (h *ArticleHandler) GetTop(ctx *gin.Context) {
 		Data: interactives,
 	})
 	return
+}
+
+func GetRequest(url string) {
+	if resp, err := http.Get(url); err == nil {
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			fmt.Printf("read from resp.Body failed, err:%v\n", err)
+			return
+		}
+		fmt.Print(string(body))
+	} else {
+		fmt.Println("请求异常")
+	}
+
 }

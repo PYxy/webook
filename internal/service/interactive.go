@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 
-	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
@@ -20,7 +19,7 @@ type InteractiveService interface {
 	// Collect 收藏
 	Collect(ctx context.Context, biz string, bizId, cid, uid int64) error
 	Get(ctx context.Context, biz string, bizId, uid int64) (domain.Interactive, error)
-	GetTopN(ctx *gin.Context, key string, top int64) ([]domain.TopInteractive, error)
+	GetTopN(ctx context.Context, key string, top int64) ([]domain.TopInteractive, error)
 }
 
 type interactiveService struct {
@@ -28,7 +27,7 @@ type interactiveService struct {
 	l    logger.LoggerV1
 }
 
-func (i *interactiveService) GetTopN(ctx *gin.Context, key string, top int64) ([]domain.TopInteractive, error) {
+func (i *interactiveService) GetTopN(ctx context.Context, key string, top int64) ([]domain.TopInteractive, error) {
 
 	return i.repo.GetTopN(ctx, key, top)
 }

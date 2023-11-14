@@ -177,6 +177,7 @@ func initWebServer(jwtHandler jwt.Handler, userhandler *web.UserHandler, article
 		InstanceID: "my-instance-1",
 	}.Build())
 	// 链路追踪
+	//webook:url的PullPath
 	server.Use(otelgin.Middleware("webook"))
 	//TODO 通用中间件注册
 	server.Use(func(ctx *gin.Context) {

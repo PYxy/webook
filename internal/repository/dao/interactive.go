@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -30,8 +32,12 @@ func (dao *GORMInteractiveDAO) GetTopN(ctx context.Context) ([]Interactive, erro
 	var result []Interactive
 	//顺序一定要对
 	//find  一定要写在最后
+	span := trace.SpanFromContext(ctx)
+	defer span.End()
+	span.AddEvent("TopNDB")
 	err := dao.db.Model(&Interactive{}).Select("id", "biz_id", "biz", "like_cnt").Order("like_cnt desc").Limit(10).Find(&result).Error
 	if err != nil {
+		span.SetAttributes(attribute.String("数据库获取topN", err.Error()))
 		return nil, err
 	}
 	return result, nil
