@@ -54,22 +54,27 @@ func (c *TopNConsumer) Consume(event []CANALEVENT) error {
 		needToSort  bool
 		needToChang bool
 	)
+	//直接过滤重复事件
+	eventMap := make(map[string]CANALEVENT, len(event))
+	for _, v := range event {
+		eventMap[v.Key()] = v
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	//要先判断 这个key 是不是已经在里面了
 	//处理CANALEVENT  这里其实是一个 切片更好
-	notExistEvent := make([]CANALEVENT, 0, 10)
+	notExistEvent := make([]CANALEVENT, 0, len(eventMap))
 
-	for _, e := range event {
-		key := e.Key()
+	for key, canalEvent := range eventMap {
+
 		_, ok := c.localDate[key]
 		if !ok {
 			fmt.Println("不命中:", key)
-			notExistEvent = append(notExistEvent, e)
+			notExistEvent = append(notExistEvent, canalEvent)
 			continue
 		}
-		fmt.Println("命中")
-		c.localDate[key] = e.ToDomain()
+		fmt.Println("命中,直接更新")
+		c.localDate[key] = canalEvent.ToDomain()
 		needToSort = true
 
 	}
@@ -96,6 +101,12 @@ func (c *TopNConsumer) Consume(event []CANALEVENT) error {
 	if len(notExistEvent) > 0 {
 		removekeys = make([]string, 0, len(notExistEvent))
 		for _, e := range notExistEvent {
+			//未满直接入队
+			if int64(c.queue.Len()) < c.count {
+				c.queue.Enqueue(e.ToDomain())
+				c.localDate[e.Key()] = e.ToDomain()
+				continue
+			}
 			//直接拿第一个就好了,比他大 就出队 入队
 			//相等的情况 可能要按某个顺序排序 或者并列的情况
 			val, _ := c.queue.Peek()

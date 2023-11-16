@@ -394,8 +394,6 @@ func (h *ArticleHandler) GetTop(ctx *gin.Context) {
 	defer spanNew.End()
 	spanNew.AddEvent("回传http 数据")
 
-	GetRequest("http://127.0.0.1:8082/test1")
-
 	//trace.SpanFromContext()
 	//然后根据 biz_id + biz 找到对应的帖子的作者以及详细内容
 

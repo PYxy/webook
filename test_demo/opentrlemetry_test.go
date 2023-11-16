@@ -55,6 +55,7 @@ func TestServer(t *testing.T) {
 
 	server.GET("/test", func(ginCtx *gin.Context) {
 		// 这个 Tracer 的名字，最好设置为唯一的，比如说用所在包名
+
 		spanCtx := t1.SpanFromContext(ginCtx.Request.Context()).SpanContext()
 		traceId := spanCtx.TraceID()
 		spanId := spanCtx.SpanID()
