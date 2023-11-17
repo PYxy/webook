@@ -8,6 +8,8 @@ kafka:
   addrs:
     - "120.132.118.90:9094"
 
+otel:
+  status: "false"
 
 
 #  使用etcd 最好使用这种

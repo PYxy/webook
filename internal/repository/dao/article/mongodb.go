@@ -17,6 +17,12 @@ type MongoDBDAO struct {
 	node    *snowflake.Node
 }
 
+func (m *MongoDBDAO) ListPubByUtime(ctx context.Context, utime time.Time, offset int, limit int) ([]PublishedArticle, error) {
+
+	//TODO implement me
+	panic("implement me")
+}
+
 func (m *MongoDBDAO) GetPubById(ctx context.Context, id int64) (PublishedArticle, error) {
 	//TODO implement me
 	panic("implement me")

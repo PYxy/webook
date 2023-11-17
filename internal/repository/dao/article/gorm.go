@@ -13,6 +13,14 @@ type GORMArticleDAO struct {
 	db *gorm.DB
 }
 
+func (dao *GORMArticleDAO) ListPubByUtime(ctx context.Context, utime time.Time, offset int, limit int) ([]PublishedArticle, error) {
+	var res []PublishedArticle
+	err := dao.db.WithContext(ctx).Order("utime DESC").
+		Where("utime < ?", utime.UnixMilli()).
+		Limit(limit).Offset(offset).Find(&res).Error
+	return res, err
+}
+
 func (dao *GORMArticleDAO) GetByAuthor(ctx context.Context, author int64, offset, limit int) ([]Article, error) {
 	var arts []Article
 	err := dao.db.WithContext(ctx).Model(&Article{}).

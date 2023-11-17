@@ -23,6 +23,7 @@ type ArticleService interface {
 	// 剩下的这个是给读者用的服务，暂时放到这里
 	// 正常来说在微服务架构下，读者服务和创作者服务会是两个独立的服务
 	GetPublishedById(ctx context.Context, id int64, uid int64) (domain.Article, error)
+	ListPub(ctx context.Context, now time.Time, offset int, size int) ([]domain.Article, error)
 }
 
 type articleService struct {
@@ -35,6 +36,12 @@ type articleService struct {
 
 	l        logger.LoggerV1
 	producer article.Producer
+}
+
+func (svc *articleService) ListPub(ctx context.Context,
+	startTime time.Time, offset, limit int) ([]domain.Article, error) {
+	//TODO implement me
+	return svc.repo.ListPub(ctx, startTime, offset, limit)
 }
 
 func (a *articleService) Withdraw(ctx context.Context, uid, id int64) error {

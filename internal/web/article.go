@@ -353,6 +353,7 @@ func (h *ArticleHandler) Like(ctx *gin.Context, request LikeReq, uc *jwt.UserCla
 func (h *ArticleHandler) GetTop(ctx *gin.Context) {
 	//可以前端参数传key
 	//ctx.Request.Context()
+
 	spanCtx, span := h.tracer.Start(ctx.Request.Context(), "main")
 	//spanCtx, span := tracer.Start(ctx.Request.Context(), "main")
 	defer span.End()

@@ -21,11 +21,17 @@ type InteractiveService interface {
 	Collect(ctx context.Context, biz string, bizId, cid, uid int64) error
 	Get(ctx context.Context, biz string, bizId, uid int64) (domain.Interactive, error)
 	GetTopN(ctx context.Context, key string, top int64) ([]domain.TopInteractive, error)
+	GetByIds(ctx context.Context, s string, ids []int64) ([]domain.Interactive, error)
 }
 
 type interactiveService struct {
 	repo repository.InteractiveRepository
 	l    logger.LoggerV1
+}
+
+func (i *interactiveService) GetByIds(ctx context.Context, s string, ids []int64) ([]domain.Interactive, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (i *interactiveService) GetTopN(ctx context.Context, key string, top int64) ([]domain.TopInteractive, error) {
