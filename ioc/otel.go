@@ -37,9 +37,10 @@ func InitOTEL() func(ctx context.Context) {
 	//}
 	//动态调整开关
 	newTp := &MyTracerProvider{
-		Enable:      atomic.NewBool(true),
-		nopProvider: trace2.NewNoopTracerProvider(),
-		provider:    tp,
+		Enable:        atomic.NewBool(true),
+		SkipTraceList: atomic.NewString(viper.GetString("otel.skip")),
+		nopProvider:   trace2.NewNoopTracerProvider(),
+		provider:      tp,
 	}
 
 	otel.SetTracerProvider(newTp)
@@ -82,9 +83,10 @@ func newPropagator() propagation.TextMapPropagator {
 
 type MyTracerProvider struct {
 	// 改原子操作
-	Enable      *atomic.Bool
-	nopProvider trace2.TracerProvider
-	provider    trace2.TracerProvider
+	Enable        *atomic.Bool
+	SkipTraceList *atomic.String
+	nopProvider   trace2.TracerProvider
+	provider      trace2.TracerProvider
 }
 type MyTracerProviderv1 struct {
 	// 改原子操作
@@ -102,9 +104,10 @@ type MyTracerProviderv1 struct {
 
 func (m *MyTracerProvider) Tracer(name string, options ...trace2.TracerOption) trace2.Tracer {
 	mtc := &MyTracer{
-		Enable:    m.Enable,
-		nopTracer: m.nopProvider.Tracer(name, options...),
-		tracer:    m.provider.Tracer(name, options...),
+		Enable:        m.Enable,
+		SkipTraceList: m.SkipTraceList,
+		nopTracer:     m.nopProvider.Tracer(name, options...),
+		tracer:        m.provider.Tracer(name, options...),
 	}
 	// 监听配置变更就可以了
 	viper.OnConfigChange(func(in fsnotify.Event) {
@@ -113,6 +116,8 @@ func (m *MyTracerProvider) Tracer(name string, options ...trace2.TracerOption) t
 		status := viper.GetString("otel.status")
 		fmt.Println("otel 状态发生变化:", status)
 		mtc.Enable.Store(gocast.Bool(status))
+		skip := viper.GetString("otel.skip")
+		mtc.SkipTraceList.Store(skip)
 		//fmt.Println(in.Name, in.Op)
 	})
 
@@ -120,15 +125,33 @@ func (m *MyTracerProvider) Tracer(name string, options ...trace2.TracerOption) t
 }
 
 type MyTracer struct {
-	Enable    *atomic.Bool
-	nopTracer trace2.Tracer
-	tracer    trace2.Tracer
+	Enable        *atomic.Bool
+	SkipTraceList *atomic.String
+	nopTracer     trace2.Tracer
+	tracer        trace2.Tracer
 }
 
 func (m *MyTracer) Start(ctx context.Context, spanName string, opts ...trace2.SpanStartOption) (context.Context, trace2.Span) {
 	if m.Enable.Load() {
+
+		//不太行 这里的spanName 是 每次start 时候填的spanName
+		//法1
+		//除非strings.Contains(spanName,"ljy")  每个接口使用独立的关键字
+		//法2
+		//或者前端在header 中传一个 标志位 搞一个中间件来读取header 中的关键字放到ctx 中
 		//在配置文件多加一个字段 针对开放的 spanName
 		//atomic.String
+
+		//skip := m.SkipTraceList.Load()
+		//fmt.Println(spanName, skip)
+		//skipSeps := strings.Split(skip, ",")
+		//fmt.Println(skipSeps)
+		//for _, val := range skipSeps {
+		//	if strings.TrimSpace(val) == spanName {
+		//		fmt.Println(spanName, "跳过")
+		//		return m.nopTracer.Start(ctx, spanName, opts...)
+		//	}
+		//}
 		return m.tracer.Start(ctx, spanName, opts...)
 	}
 	return m.nopTracer.Start(ctx, spanName, opts...)

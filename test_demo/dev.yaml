@@ -9,8 +9,8 @@ kafka:
     - "120.132.118.90:9094"
 
 otel:
-  status: "false"
-
+  status: "true"
+  skip: "artical-query"
 
 #  使用etcd 最好使用这种
 #
