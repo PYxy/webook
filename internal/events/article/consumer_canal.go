@@ -171,7 +171,7 @@ func (t TopNConsumer) Start() error {
 		err := cg.Consume(context.Background(),
 			[]string{"webook_interactives"}, //topic
 			//实现那3个方法的对象
-			saramax.NewCanalHandler[CANALEVENT](t.l, t.Consume))
+			saramax.NewCanalHandler[CANALEVENT](t.l, t.Consume, "topN"))
 		if err != nil {
 			t.l.Error("退出了消费循环异常", logger.Error(err))
 		}

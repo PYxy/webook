@@ -305,7 +305,7 @@ func initArticle(db *gorm.DB,
 	//kafka  生产者创建
 	client := ioc.InitKafka()
 	syncProducer := ioc.NewSyncProducer(client)
-	producer := article2.NewKafkaProducer(syncProducer)
+	producer := article2.NewKafkaProducer(syncProducer, "readEvent")
 
 	svc := service.NewArticleService(repo, l, producer)
 
