@@ -47,8 +47,8 @@ type TopNConsumer struct {
 }
 
 func (c *TopNConsumer) Consume(event []CANALEVENT) error {
-	fmt.Println("需要更新的事件:", event)
-	fmt.Println("原始数据1:", c.localDate)
+	//fmt.Println("需要更新的事件:", event)
+	//fmt.Println("原始数据1:", c.localDate)
 	var (
 		removekeys  []string
 		needToSort  bool
@@ -69,17 +69,17 @@ func (c *TopNConsumer) Consume(event []CANALEVENT) error {
 
 		_, ok := c.localDate[key]
 		if !ok {
-			fmt.Println("不命中:", key)
+			//fmt.Println("不命中:", key)
 			notExistEvent = append(notExistEvent, canalEvent)
 			continue
 		}
-		fmt.Println("命中,直接更新")
+		//fmt.Println("命中,直接更新")
 		c.localDate[key] = canalEvent.ToDomain()
 		needToSort = true
 
 	}
 
-	fmt.Println("原始数据2:", c.queue.RawData())
+	//fmt.Println("原始数据2:", c.queue.RawData())
 	//原有的排名中的人 有更新的先更新
 	if needToSort {
 		newQueue := queue.NewPriorityQueue[domain.TopInteractive](-1, func(src domain.TopInteractive, dst domain.TopInteractive) int {
@@ -113,7 +113,7 @@ func (c *TopNConsumer) Consume(event []CANALEVENT) error {
 			if val.LikeCnt < e.Like_cnt {
 				needToChang = true
 				//删除map 中的
-				fmt.Println("需要删除key:", val.Key())
+				//fmt.Println("需要删除key:", val.Key())
 				removekeys = append(removekeys, val.Key())
 				delete(c.localDate, val.Key())
 				//出头

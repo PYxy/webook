@@ -18,10 +18,10 @@ import (
 )
 
 type CanalHandler[T any] struct {
-	l     logger.LoggerV1
-	fn    func(t []T) error
-	gauge *prometheus.GaugeVec
-	count *prometheus.CounterVec
+	l       logger.LoggerV1
+	fn      func(t []T) error
+	gauge   *prometheus.GaugeVec
+	counter *prometheus.CounterVec
 }
 
 func NewCanalHandler[T any](l logger.LoggerV1, fn func(t []T) error, name string) *CanalHandler[T] {
@@ -33,20 +33,20 @@ func NewCanalHandler[T any](l logger.LoggerV1, fn func(t []T) error, name string
 		Help:        "统计 kafka 分区的offset(看下有没有数据倾斜)",
 		ConstLabels: nil,
 	}, labels)
-	tmpCount := prometheus.NewCounterVec(prometheus.CounterOpts{
+	tmpCounter := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "webook",
 		Subsystem: "article_consumer",
 		Name:      name,
 		Help:      "统计 从kafka 中每个消息消费的速度",
 	}, labels)
 	ch := &CanalHandler[T]{
-		l:     l,
-		fn:    fn,
-		gauge: tmpGauge,
-		count: tmpCount,
+		l:       l,
+		fn:      fn,
+		gauge:   tmpGauge,
+		counter: tmpCounter,
 	}
 
-	prometheus.MustRegister([]prometheus.Collector{tmpGauge, tmpCount}...)
+	prometheus.MustRegister([]prometheus.Collector{tmpGauge, tmpCounter}...)
 
 	return ch
 }
@@ -90,7 +90,7 @@ func (h CanalHandler[T]) ConsumeClaim(session sarama.ConsumerGroupSession, claim
 				}
 				res, err := printEntry[T](mes.Entries)
 				if err != nil {
-					h.gauge.WithLabelValues(message.Topic, gocast.Str(message.Partition)).Inc()
+					h.counter.WithLabelValues(message.Topic, gocast.Str(message.Partition)).Inc()
 					h.l.Warn("解析信息失败", logger.Error(err),
 						logger.Int64("offset", message.Offset),
 						logger.Int64("partition", int64(message.Partition)),

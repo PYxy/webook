@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"log"
 	"math"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/ecodeclub/ekit/slice"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
+	"gitee.com/geekbang/basic-go/webook/internal/repository"
 )
 
 var ErrOutOfCapacity = errors.New("ekit: 超出最大容量限制")
@@ -25,6 +25,7 @@ type RankingService interface {
 type BatchRankingService struct {
 	artSvc  ArticleService
 	intrSvc InteractiveService
+	repo    repository.RankingRepository
 	// 多少条数据为一批
 	batchSize int
 	// 表示需要排名TOP n 的个数(前N名)
@@ -40,8 +41,7 @@ func (svc *BatchRankingService) TopN(ctx context.Context) error {
 		return err
 	}
 	// 在这里，存起来
-	log.Println(arts)
-	return nil
+	return svc.repo.ReplaceTopN(ctx, arts)
 }
 
 func (svc *BatchRankingService) topN(ctx context.Context) ([]domain.Article, error) {
@@ -67,6 +67,7 @@ func (svc *BatchRankingService) topN(ctx context.Context) ([]domain.Article, err
 
 	for {
 		// 这里拿了一批
+		//获取所有的文章列表
 		arts, err := svc.artSvc.ListPub(ctx, now, offset, svc.batchSize)
 		if err != nil {
 			return nil, err
@@ -83,6 +84,7 @@ func (svc *BatchRankingService) topN(ctx context.Context) ([]domain.Article, err
 		// 合并计算 score
 		// 排序
 		for _, art := range arts {
+			//根据id 获取到对应的点赞对象
 			intr := intrs[art.Id]
 			//if !ok {
 			//	// 你都没有，肯定不可能是热榜
@@ -97,6 +99,7 @@ func (svc *BatchRankingService) topN(ctx context.Context) ([]domain.Article, err
 			})
 			// 这种写法，要求 topN 已经满了
 			if err == ErrOutOfCapacity {
+				//这里不应该是直接dequeue 应该写一个方法 获取最小的值 但是不出队 减少消耗
 				val, _ := topN.Dequeue()
 				if val.score < score {
 					err = topN.Enqueue(Score{
@@ -110,11 +113,13 @@ func (svc *BatchRankingService) topN(ctx context.Context) ([]domain.Article, err
 		}
 
 		// 一批已经处理完了，问题来了，我要不要进入下一批？我怎么知道还有没有？
-		if len(arts) < svc.batchSize {
+		if len(arts) < svc.batchSize ||
+			//只获取7天之内更新的数据
+			now.Sub(arts[len(arts)-1].Utime).Hours() < 7*24 {
 			// 我这一批都没取够，我当然可以肯定没有下一批了
 			break
 		}
-		// 这边要更新 offset
+		// 这边要更新 offset 方便下次从上一次结束的敌法开始
 		offset = offset + len(arts)
 	}
 	// 最后得出结果
