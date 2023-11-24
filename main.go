@@ -17,6 +17,7 @@ import (
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/robfig/cron/v3"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	_ "github.com/spf13/viper/remote"
@@ -27,6 +28,7 @@ import (
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
 	article2 "gitee.com/geekbang/basic-go/webook/internal/events/article"
+	"gitee.com/geekbang/basic-go/webook/internal/job"
 	"gitee.com/geekbang/basic-go/webook/internal/repository/cache"
 	"gitee.com/geekbang/basic-go/webook/internal/repository/dao/article"
 	local2 "gitee.com/geekbang/basic-go/webook/internal/service/sms/local"
@@ -88,10 +90,26 @@ func main() {
 	server := initWebServer(jwtHandler, user, art)
 	// 初始化 UserHandle
 
+	//定时任务初始化
+
 	server.Run(":8091")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	endFunc(ctx)
+}
+
+func InitJobs(l logger2.LoggerV1, rankingJob *job.RankingJob) *cron.Cron {
+	//cron 的壳
+	res := cron.New(cron.WithSeconds())
+	//job 的壳
+	cbd := job.NewCronJobBuilder(l)
+	//添加定时任务
+	// 这里每三分钟一次
+	_, err := res.AddJob("0 */3 * * * ?", cbd.Build(rankingJob))
+	if err != nil {
+		panic(err)
+	}
+	return res
 }
 
 //func main2() {

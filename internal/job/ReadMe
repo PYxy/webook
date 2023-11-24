@@ -1,0 +1,42 @@
+
+mysql 里面保存
+Job {
+Execute  string   关联字段
+}
+
+
+任务本身(分类)
+Executor{
+ Name()
+ Exec() ->任务该怎么执行
+}
+
+调度器
+Scheduler
+{
+    execs   map[string]Executor   #记录每一中定时任务是怎么执行的 key 就是Executor.Name()
+    svc     service.JobService    #负责从数据库中抢任务
+    l       logger.LoggerV1       #
+    limiter *semaphore.Weighted   #限制1个实例运行同时执行多少个任务
+}
+
+
+func InitScheduler(l logger.LoggerV1,
+	local *job.LocalFuncExecutor,
+	svc service.JobService) *job.Scheduler {
+	res := job.NewScheduler(svc, l)
+	res.RegisterExecutor(local)
+	return res
+}
+
+func InitLocalFuncExecutor(svc service.RankingService) *job.LocalFuncExecutor {
+	res := job.NewLocalFuncExecutor()
+	// 要在数据库里面插入一条记录。
+	// ranking job 的记录，通过管理任务接口来插入
+	res.RegisterFunc("ranking", func(ctx context.Context, j domain.Job) error {
+		ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+		defer cancel()
+		return svc.TopN(ctx)
+	})
+	return res
+}

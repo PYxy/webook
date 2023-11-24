@@ -159,7 +159,7 @@ func printEntry[T any](entrys []pbe.Entry) (T, error) {
 			eventType := rowChange.GetEventType()
 			//header := entry.GetHeader()
 			//fmt.Println(fmt.Sprintf("================> binlog[%s : %d],name[%s,%s], eventType: %s", header.GetLogfileName(), header.GetLogfileOffset(), header.GetSchemaName(), header.GetTableName(), header.GetEventType()))
-
+			eventType.String()
 			for _, rowData := range rowChange.GetRowDatas() {
 				if eventType == pbe.EventType_DELETE {
 					//printColumn(rowData.GetBeforeColumns())
