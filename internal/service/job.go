@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
@@ -13,6 +14,7 @@ type JobService interface {
 	// Preempt 抢占
 	Preempt(ctx context.Context) (domain.Job, error)
 	ResetNextTime(ctx context.Context, j domain.Job) error
+	NeedToReset() bool
 	// 我返回一个释放的方法，然后调用者取调
 	// PreemptV1(ctx context.Context) (domain.Job, func() error,  error)
 	// Release
@@ -23,6 +25,11 @@ type cronJobService struct {
 	repo            repository.JobRepository
 	refreshInterval time.Duration
 	l               logger.LoggerV1
+	needToUpdate    *atomic.Bool
+}
+
+func (p *cronJobService) NeedToReset() bool {
+	return p.needToUpdate.Load()
 }
 
 func (p *cronJobService) Preempt(ctx context.Context) (domain.Job, error) {
@@ -54,6 +61,7 @@ func (p *cronJobService) Preempt(ctx context.Context) (domain.Job, error) {
 			//这里可以给重试
 			err2 := p.refresh(j.Id, j.Version)
 			if err2 != nil {
+				p.needToUpdate.Store(false)
 				break
 			}
 		}

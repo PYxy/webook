@@ -31,6 +31,7 @@ func (h Handler[T]) Cleanup(session sarama.ConsumerGroupSession) error {
 }
 
 // ConsumeClaim 可以使用装饰器封装重试
+// 数据收集方法
 func (h Handler[T]) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	msgs := claim.Messages()
 	for msg := range msgs {

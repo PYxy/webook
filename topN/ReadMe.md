@@ -1,6 +1,6 @@
 ```text
-1.使用cancel 读取 mysql 中webook.interactives 表 的binlog 日志,将产生的数据放到kafka 中
-2.webook 服务 中加一个cancel 的consumer
+1.使用cnacal 读取 mysql 中webook.interactives 表 的binlog 日志,将产生的数据放到kafka 中
+2.webook 服务 中加一个cnacal 的consumer
 3.该consumer 启动的时候先从数据库中 获取topN 的数据 然后存到redis 中，并在本地使用map 记录topN 的数据 以及使用小顶堆进行排序
 4.该concumer 读取kafka 中的事件,先判断 
    1.对应的对象是否在map 中，如果在就更新对应的点赞数等,再依据map 来生成小顶堆,再继续走4.2
@@ -9,7 +9,7 @@
 5.查询可以直接从redis 中获取也行,(优化点:如果需要可以加一个本地缓存(多节点的情况下 可以使用redis 的订阅功能进行数据同步))
 
 缺点: 
-    1.consumer 批量处理 cancel消息的时候进行去重(可以减少数据的传输),cancel 的数据具有可重入的特性
+    1.consumer 批量处理 cnacal消息的时候进行去重(可以减少数据的传输),cnacal 的数据具有可重入的特性
     2.如果TopN N数据过大的情况下 4.1步骤比较吃性能
 优点:
     1.整个流程只需要在启动的时候操作一次mysql,如果建立本地缓存+redis 订阅功能  可以不通过mysql 就可以获取到topN的数据  
@@ -47,7 +47,7 @@ localcache 的过期时间 < redis 的过期时间
 ## 测试
 
 ```bash
-cancel 、 mysql 、 redis 、 kafka 容器启动
+cnacal 、 mysql 、 redis 、 kafka 容器启动
 webook 服务启动
 ```
 用于监控测试数据

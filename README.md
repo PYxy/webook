@@ -225,4 +225,29 @@ Authorization bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTUxMDkzMj
 5.使用原来的refresh token 去更新access token
 
 
+
+
+
+```
+##  GRPC
+```bash
+
+buf 安装
+go install github.com/bufbuild/buf/cmd/buf@v1.18.0
+
+或
+
+# 最新版
+$ go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+ 
+# 指定版本
+$ go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.3.0
+
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+
+生成 pb.go 文件
+PS F:\git_push\webook> buf generate api/proto
+
+
 ```

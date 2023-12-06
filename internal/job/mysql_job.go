@@ -72,6 +72,10 @@ func (s *Scheduler) Schedule(ctx context.Context) error {
 			// 退出调度循环
 			return ctx.Err()
 		}
+		//负载均衡判断
+		//随机数判断是不是负载超过多少就不错(实际按照任务的关键指标去判断)
+		//要找一个中间体(mysql  redis 订阅功能 广播自己的负载)
+		// 限制可同时运行的任务个数
 		err := s.limiter.Acquire(ctx, 1)
 		if err != nil {
 			return err
@@ -81,6 +85,7 @@ func (s *Scheduler) Schedule(ctx context.Context) error {
 		j, err := s.svc.Preempt(dbCtx)
 		cancel()
 		if err != nil {
+			s.limiter.Release(1)
 			// 你不能 return
 			// 你要继续下一轮
 			s.l.Error("抢占任务失败", logger.Error(err))
@@ -100,6 +105,7 @@ func (s *Scheduler) Schedule(ctx context.Context) error {
 		// 怎么执行？
 		go func() {
 			defer func() {
+				// 释放
 				s.limiter.Release(1)
 				err1 := j.CancelFunc()
 				if err1 != nil {
@@ -117,10 +123,13 @@ func (s *Scheduler) Schedule(ctx context.Context) error {
 				s.l.Error("任务执行失败", logger.Error(err1))
 			}
 			// 你要不要考虑下一次调度？
+			if !s.svc.NeedToReset() {
+				s.l.Error("协程续约失败,退出当前协程")
+				return
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			//判断如果续约失败 这里就不要设置了
-
+			//判断如果续约失败 这里就不要设置了(ResetNextTime 即使使用了版本去更新, 即使查不到去更新依旧返回nil)
 			err1 = s.svc.ResetNextTime(ctx, j)
 			if err1 != nil {
 				s.l.Error("设置下一次执行时间失败", logger.Error(err1))

@@ -1,0 +1,14 @@
+version: v1
+managed:
+  enabled: true
+  go_package_prefix:
+    #gitee.com/geekbang/basic-go/webook/ go mod init 时候的名称  api/proto/gen 监控下面所有的.proto 文件
+    default: "gitee.com/geekbang/basic-go/webook/api/proto/gen"
+plugins:
+  - plugin: buf.build/protocolbuffers/go
+    out: api/proto/gen  #文件输出地址是以当前文件路径出发
+    opt: paths=source_relative
+
+  - plugin: buf.build/grpc/go
+    out: api/proto/gen #文件输出地址是以当前文件路径出发
+    opt: paths=source_relative

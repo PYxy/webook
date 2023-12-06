@@ -73,6 +73,7 @@ func TestAsyncProducer(t *testing.T) {
 	producer, err := sarama.NewAsyncProducer(addrs, cfg)
 	require.NoError(t, err)
 	msgCh := producer.Input()
+
 	var n int
 	go func() {
 		for {
