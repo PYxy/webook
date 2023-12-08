@@ -88,6 +88,8 @@ func main() {
 	art := initArticle(db, logger, cache1)
 	//中间件绑定以及路由注册
 	server := initWebServer(jwtHandler, user, art)
+	// wire 的用法
+	//server :=InitWebServer()
 	// 初始化 UserHandle
 
 	//定时任务初始化

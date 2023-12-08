@@ -2,11 +2,13 @@ package repository
 
 import (
 	"context"
+
+	"github.com/ecodeclub/ekit/slice"
+
 	"gitee.com/geekbang/basic-go/webook/interactive/domain"
 	"gitee.com/geekbang/basic-go/webook/interactive/repository/cache"
 	"gitee.com/geekbang/basic-go/webook/interactive/repository/dao"
 	"gitee.com/geekbang/basic-go/webook/pkg/logger"
-	"github.com/ecodeclub/ekit/slice"
 )
 
 //go:generate mockgen -source=./interactive.go -package=repomocks -destination=mocks/interactive.mock.go InteractiveRepository
@@ -145,7 +147,7 @@ func (c *CachedReadCntRepository) toDomain(intr dao.Interactive) domain.Interact
 	}
 }
 
-func NewCachedInteractiveRepository(dao dao.InteractiveDAO,
+func NewCachedInteractiveRepositoryv2(dao dao.InteractiveDAO,
 	cache cache.InteractiveCache, l logger.LoggerV1) InteractiveRepository {
 	return &CachedReadCntRepository{
 		dao:   dao,

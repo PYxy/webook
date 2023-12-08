@@ -3,8 +3,13 @@ package job
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"strings"
 	"time"
 
+	"github.com/demdxx/gocast/v2"
+	"github.com/redis/go-redis/v9"
+	"go.uber.org/atomic"
 	"golang.org/x/sync/semaphore"
 
 	"gitee.com/geekbang/basic-go/webook/internal/domain"
@@ -53,16 +58,91 @@ type Scheduler struct {
 	svc     service.JobService
 	l       logger.LoggerV1
 	limiter *semaphore.Weighted
+
+	name        string        //发布订阅的唯一标识
+	targetChan  string        //发布订阅的通道
+	myScore     *atomic.Int64 //自己的最低值
+	OtherScore  *atomic.Int64 // 全部实例的最低值
+	redisClient redis.Client
 }
 
-func NewScheduler(svc service.JobService, l logger.LoggerV1) *Scheduler {
+func NewScheduler(svc service.JobService, l logger.LoggerV1, name string, client redis.Client) *Scheduler {
 	return &Scheduler{svc: svc, l: l,
 		limiter: semaphore.NewWeighted(200),
-		execs:   make(map[string]Executor)}
+		execs:   make(map[string]Executor),
+		//-----------------
+		name:        name,
+		targetChan:  "jobToInteractive",
+		myScore:     atomic.NewInt64(10),
+		OtherScore:  atomic.NewInt64(0),
+		redisClient: client,
+	}
+
 }
 
 func (s *Scheduler) RegisterExecutor(exec Executor) {
 	s.execs[exec.Name()] = exec
+}
+
+// 获取其他选手的负载
+func (s *Scheduler) subscribe(ctx context.Context) {
+	//
+	//// 接收消息
+	//for {
+	//	msg, err := pubsub.ReceiveMessage(ctx)
+	//	if err != nil {
+	//		fmt.Println(err)
+	//		return
+	//	}
+	//	fmt.Println(msg.Channel, msg.Payload)
+	//}
+	pubsub := s.redisClient.Subscribe(ctx, s.targetChan)
+
+	go func() {
+		defer func() {
+			_ = pubsub.Close()
+		}()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				msg, err := pubsub.ReceiveMessage(ctx)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				//fmt.Println(msg.Channel, msg.Payload)
+				//这里不会有并发问题
+				NewScore := gocast.Int64(strings.Split(msg.Payload, ":")[1])
+
+				if s.OtherScore.Load() < NewScore {
+					s.OtherScore.Store(NewScore)
+				}
+			}
+
+		}
+	}()
+
+}
+
+// 向其他选手发布自己的负载
+func (s *Scheduler) publish(ctx context.Context) {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				weight := rand.Int63n(100)
+				s.myScore.Store(weight)
+				err := s.redisClient.Publish(ctx, s.targetChan, fmt.Sprintf("%v:%v", s.name, weight)).Err()
+				s.l.Error("发布自身负载失败", logger.Error(err))
+				time.Sleep(time.Second * 2)
+			}
+
+		}
+	}()
 }
 
 func (s *Scheduler) Schedule(ctx context.Context) error {
@@ -71,6 +151,10 @@ func (s *Scheduler) Schedule(ctx context.Context) error {
 		if ctx.Err() != nil {
 			// 退出调度循环
 			return ctx.Err()
+		}
+		//分数比人家大就不抢了
+		if s.myScore.Load() > s.OtherScore.Load() {
+			continue
 		}
 		//负载均衡判断
 		//随机数判断是不是负载超过多少就不错(实际按照任务的关键指标去判断)

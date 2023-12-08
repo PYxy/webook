@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/pflag"
@@ -10,18 +9,18 @@ import (
 )
 
 func main() {
-	initViperV1()
-	// 这里暂时随便搞一下
-	// 搞成依赖注入
-	app := InitAPP()
-	for _, c := range app.consumers {
-		err := c.Start()
-		if err != nil {
-			panic(err)
-		}
-	}
-	err := app.server.Serve()
-	log.Println(err)
+	//initViperV1()
+	//// 这里暂时随便搞一下
+	//// 搞成依赖注入
+	//app := InitAPP()
+	//for _, c := range app.consumers {
+	//	err := c.Start()
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//}
+	//err := app.server.Serve()
+	//log.Println(err)
 }
 
 //func mainV1() {

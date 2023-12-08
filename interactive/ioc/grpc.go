@@ -1,10 +1,11 @@
 package ioc
 
 import (
-	grpc2 "gitee.com/geekbang/basic-go/webook/interactive/grpc"
-	"gitee.com/geekbang/basic-go/webook/pkg/grpcx"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
+
+	grpc2 "gitee.com/geekbang/basic-go/webook/interactive/grpc"
+	"gitee.com/geekbang/basic-go/webook/pkg/grpcx"
 )
 
 func InitGRPCxServer(intrServer *grpc2.InteractiveServiceServer) *grpcx.Server {

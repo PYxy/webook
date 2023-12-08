@@ -21,10 +21,10 @@ var thirdPartySet = wire.NewSet(ioc.InitDB,
 	ioc.InitRedis)
 
 var interactiveSvcProvider = wire.NewSet(
-	service.NewInteractiveService,
-	repository.NewCachedInteractiveRepository,
 	dao.NewGORMInteractiveDAO,
 	cache.NewRedisInteractiveCache,
+	repository.NewCachedInteractiveRepositoryv2,
+	service.NewInteractiveService,
 )
 
 func InitAPP() *App {

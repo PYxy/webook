@@ -74,7 +74,7 @@ func (r *RankingJob) Run() error {
 			}
 			r.localLock.Lock()
 			r.lock = nil
-			defer r.localLock.Unlock()
+			r.localLock.Unlock()
 
 			// lock.Unlock(ctx)
 		}()
