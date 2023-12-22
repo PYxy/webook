@@ -25,7 +25,7 @@ type cronJobService struct {
 	repo            repository.JobRepository
 	refreshInterval time.Duration
 	l               logger.LoggerV1
-	needToUpdate    *atomic.Bool
+	needToUpdate    *atomic.Bool //没必要
 }
 
 func (p *cronJobService) NeedToReset() bool {

@@ -2,12 +2,11 @@ package dao
 
 import (
 	"context"
+	"gitee.com/geekbang/basic-go/webook/pkg/migrator"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"time"
 )
-
-var ErrDataNotFound = gorm.ErrRecordNotFound
 
 //go:generate mockgen -source=./interactive.go -package=daomocks -destination=mocks/interactive.mock.go InteractiveDAO
 type InteractiveDAO interface {
@@ -192,15 +191,20 @@ type Interactive struct {
 	Biz        string `gorm:"type:varchar(128);uniqueIndex:biz_type_id"`
 	ReadCnt    int64
 	CollectCnt int64
-	// 作业：就是直接在 LikeCnt 上创建一个索引
-	// 1. 而后查询前 100 的，直接就命中索引，这样你前 100 最多 100 次回表
-	// SELECT * FROM interactives ORDER BY like_cnt limit 0, 100
-	// 还有一种优化思路是
-	// SELECT * FROM interactives WHERE like_cnt > 1000 ORDER BY like_cnt limit 0, 100
-	// 2. 如果你只需要 biz_id 和 biz_type，你就创建联合索引 <like_cnt, biz_id, biz>
-	LikeCnt int64
-	Ctime   int64
-	Utime   int64
+	LikeCnt    int64
+	Ctime      int64
+	Utime      int64
+}
+
+func (i Interactive) ID() int64 {
+	return i.Id
+}
+
+func (i Interactive) CompareTo(dst migrator.Entity) bool {
+	if di, ok := dst.(Interactive); ok {
+		return di == i
+	}
+	return false
 }
 
 // UserLikeBiz 命名无能，用户点赞的某个东西
@@ -240,35 +244,4 @@ type UserCollectionBiz struct {
 	Uid   int64 `gorm:"uniqueIndex:biz_type_id_uid"`
 	Ctime int64
 	Utime int64
-}
-
-func multipleCh() {
-	ch0 := make(chan msg, 100000)
-	ch1 := make(chan msg, 100000)
-	go func() {
-		for {
-			var m msg
-			select {
-			case ch0 <- m:
-			default:
-				ch1 <- m
-			}
-		}
-	}()
-
-	go func() {
-		for {
-			var m msg
-			select {
-			case ch1 <- m:
-			default:
-				ch0 <- m
-			}
-		}
-	}()
-}
-
-type msg struct {
-	biz   string
-	bizId int64
 }
