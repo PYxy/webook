@@ -77,6 +77,7 @@ func (s *ConsulTestSuite) TestServer() {
 	//将grpc 服务器注册到 consul 上
 	servicename := "user"
 	addr := "127.0.0.1:8080"
+	//健康检查
 	_ = &api.AgentServiceCheck{
 		GRPC:                           addr,  // grpc 访问地址
 		Timeout:                        "10s", // 超时时间
@@ -90,7 +91,7 @@ func (s *ConsulTestSuite) TestServer() {
 		Tags:    []string{servicename, addr},             //服务标签
 		Address: "127.0.0.1",
 		Port:    8080,
-		//Check:   check,
+		//Check:   check, 这里不能加进去 因为是内网 不然consul 显示为异常
 	}
 	err = s.client.Agent().ServiceRegister(agentService)
 	require.NoError(s.T(), err)
