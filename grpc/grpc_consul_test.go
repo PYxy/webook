@@ -29,6 +29,7 @@ func (s *ConsulTestSuite) SetupSuite() {
 }
 
 func (s *ConsulTestSuite) TestClient() {
+	// servicename 尽量不要有  “/” 不然下面的 服务发现 会查找失败
 	servicename := "user"
 	cc, err := grpc.Dial(
 		// consul服务
@@ -54,7 +55,7 @@ func (s *ConsulTestSuite) TestClient() {
 	////serviceAddr := "127.0.0.1:8080"
 	////id := fmt.Sprintf("%s-%s", servicename, serviceAddr)
 	//fmt.Println(s.client.Agent().Services())
-	//serviceMap, err := s.client.Agent().ServicesWithFilter("Service==`/service/user`")
+	//serviceMap, err := s.client.Agent().ServicesWithFilter("Service==`user`")
 	//if err != nil {
 	//	fmt.Printf("query service from consul failed, err:%v\n", err)
 	//	return
@@ -88,7 +89,7 @@ func (s *ConsulTestSuite) TestServer() {
 		Name:    servicename,                             // 服务名称
 		Tags:    []string{servicename, addr},             //服务标签
 		Address: "127.0.0.1",
-		Port:    8000,
+		Port:    8080,
 		//Check:   check,
 	}
 	err = s.client.Agent().ServiceRegister(agentService)
@@ -101,7 +102,7 @@ func (s *ConsulTestSuite) TestServer() {
 		err = server.Serve(l)
 		s.T().Log(err)
 	}()
-	time.Sleep(time.Second * 20)
+	time.Sleep(time.Second * 60)
 	fmt.Println("服务强制停止....")
 	// 注销服务
 	err = s.client.Agent().ServiceDeregister(fmt.Sprintf("%s-%s", servicename, addr))
