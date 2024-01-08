@@ -31,23 +31,34 @@ func (s *ConsulTestSuite) SetupSuite() {
 func (s *ConsulTestSuite) TestClient() {
 	// servicename 尽量不要有  “/” 不然下面的 服务发现 会查找失败
 	servicename := "user"
+	bd := NewconsulResolverBuilder(s.client, time.Second*2, servicename)
+
 	cc, err := grpc.Dial(
 		// consul服务
 		fmt.Sprintf("consul://120.132.118.90:8500/%s?healthy=true", servicename),
 		//"127.0.0.1:8080",
+		grpc.WithResolvers(bd),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
+	if err != nil {
+		panic(err)
+	}
 	defer cc.Close()
 	client := NewUserServiceClient(cc)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	//ctx = context.WithValue(ctx, "balancer-key", 123)
-	resp, err := client.GetById(ctx, &GetByIdRequest{
-		Id: 123,
-	})
-	require.NoError(s.T(), err)
-	s.T().Log(resp.User)
-	time.Sleep(time.Minute)
+	for i := 0; i < 10; i++ {
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+
+		//ctx = context.WithValue(ctx, "balancer-key", 123)
+		resp, err := client.GetById(ctx, &GetByIdRequest{
+			Id: 123,
+		})
+		require.NoError(s.T(), err)
+		s.T().Log(resp.User)
+		time.Sleep(time.Minute)
+		cancel()
+
+	}
 
 	return
 	// 获取etcd 中所有的注册服务
@@ -103,7 +114,7 @@ func (s *ConsulTestSuite) TestServer() {
 		err = server.Serve(l)
 		s.T().Log(err)
 	}()
-	time.Sleep(time.Second * 60)
+	time.Sleep(time.Hour * 60)
 	fmt.Println("服务强制停止....")
 	// 注销服务
 	err = s.client.Agent().ServiceDeregister(fmt.Sprintf("%s-%s", servicename, addr))
