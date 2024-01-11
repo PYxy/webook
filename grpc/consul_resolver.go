@@ -25,6 +25,7 @@ func NewconsulResolverBuilder(client *api.Client, interval time.Duration, servic
 }
 
 func (c *consulResolverBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
+	fmt.Println("build1")
 	res := &consulResolver{
 		client:      c.client,
 		serviceName: c.serviceName,
@@ -55,7 +56,7 @@ func (c *consulResolver) watch() error {
 			//services, meta, err := c.client.KV().Keys(c.target, "", q)
 			services, meta, err := c.client.Health().Service(c.serviceName, c.serviceName, true, q)
 			if err != nil {
-				panic(err)
+				continue
 			}
 			fmt.Println(q.WaitIndex, meta.LastIndex)
 			q.WaitIndex = meta.LastIndex
@@ -71,8 +72,6 @@ func (c *consulResolver) watch() error {
 			fmt.Println("获取到最新的addrs:", Addrs)
 			err = c.cc.UpdateState(resolver.State{Addresses: Addrs})
 			fmt.Println("节点跟新结果:", err)
-			time.Sleep(c.interval)
-
 		}
 	}()
 
@@ -85,5 +84,5 @@ func (c *consulResolver) ResolveNow(options resolver.ResolveNowOptions) {
 
 func (c *consulResolver) Close() {
 	//TODO implement me
-	panic("implement me")
+	//panic("implement me")
 }

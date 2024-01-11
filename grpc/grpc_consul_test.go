@@ -38,6 +38,9 @@ func (s *ConsulTestSuite) TestClient() {
 		fmt.Sprintf("consul://120.132.118.90:8500/%s?healthy=true", servicename),
 		//"127.0.0.1:8080",
 		grpc.WithResolvers(bd),
+		grpc.WithDefaultServiceConfig(`{
+"loadBalancingConfig": [{"round_robin":{}}]
+}`),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -45,6 +48,7 @@ func (s *ConsulTestSuite) TestClient() {
 	}
 	defer cc.Close()
 	client := NewUserServiceClient(cc)
+	fmt.Println("????????")
 	for i := 0; i < 10; i++ {
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -54,13 +58,11 @@ func (s *ConsulTestSuite) TestClient() {
 			Id: 123,
 		})
 		require.NoError(s.T(), err)
-		s.T().Log(resp.User)
-		time.Sleep(time.Minute)
+		fmt.Println(resp.User)
 		cancel()
 
 	}
-
-	return
+	fmt.Println("over")
 	// 获取etcd 中所有的注册服务
 	////servicename := "user"
 	////serviceAddr := "127.0.0.1:8080"
@@ -108,7 +110,7 @@ func (s *ConsulTestSuite) TestServer() {
 	require.NoError(s.T(), err)
 
 	server := grpc.NewServer()
-	RegisterUserServiceServer(server, &Server{})
+	RegisterUserServiceServer(server, &Server{Name: "内网"})
 	fmt.Println("????")
 	go func() {
 		err = server.Serve(l)

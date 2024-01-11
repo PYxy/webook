@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -40,7 +41,7 @@ func (s *EtcdTestSuite) TestClient() {
 		//}),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	client := NewUserServiceClient(cc)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 	//ctx = context.WithValue(ctx, "balancer-key", 123)
 	resp, err := client.GetById(ctx, &GetByIdRequest{
@@ -51,10 +52,11 @@ func (s *EtcdTestSuite) TestClient() {
 	time.Sleep(time.Minute)
 }
 
+// 标准写法
 func (s *EtcdTestSuite) TestServer() {
 	l, err := net.Listen("tcp", ":8091")
 	require.NoError(s.T(), err)
-
+	fmt.Println("第一个:", "service/user")
 	// endpoint 以服务为维度。一个服务一个 Manager
 	em, err := endpoints.NewManager(s.client, "service/user")
 	require.NoError(s.T(), err)
@@ -77,6 +79,7 @@ func (s *EtcdTestSuite) TestServer() {
 
 	ctx, cancel = context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
+	fmt.Println("第二个key:", key)
 	err = em.AddEndpoint(ctx, key, endpoints.Endpoint{
 		Addr: addr,
 		Metadata: map[string]any{
