@@ -5,8 +5,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
-
-	"google.golang.org/grpc/resolver"
+	gresolver "google.golang.org/grpc/resolver"
 )
 
 type consulResolverBuilder struct {
@@ -24,7 +23,7 @@ func NewconsulResolverBuilder(client *api.Client, interval time.Duration, servic
 	}
 }
 
-func (c *consulResolverBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
+func (c *consulResolverBuilder) Build(target gresolver.Target, cc gresolver.ClientConn, opts gresolver.BuildOptions) (gresolver.Resolver, error) {
 	fmt.Println("build1")
 	res := &consulResolver{
 		client:      c.client,
@@ -45,7 +44,7 @@ func (n *consulResolverBuilder) Scheme() string {
 type consulResolver struct {
 	client      *api.Client
 	serviceName string
-	cc          resolver.ClientConn
+	cc          gresolver.ClientConn
 	interval    time.Duration
 }
 
@@ -61,16 +60,16 @@ func (c *consulResolver) watch() error {
 			fmt.Println(q.WaitIndex, meta.LastIndex)
 			q.WaitIndex = meta.LastIndex
 
-			var Addrs []resolver.Address
+			var Addrs []gresolver.Address
 			for _, service := range services {
 				addr := fmt.Sprintf("%v:%v", service.Service.Address, service.Service.Port)
-				Addrs = append(Addrs, resolver.Address{
+				Addrs = append(Addrs, gresolver.Address{
 					Addr:       addr,
 					ServerName: service.Service.Service,
 				})
 			}
 			fmt.Println("获取到最新的addrs:", Addrs)
-			err = c.cc.UpdateState(resolver.State{Addresses: Addrs})
+			err = c.cc.UpdateState(gresolver.State{Addresses: Addrs})
 			fmt.Println("节点跟新结果:", err)
 		}
 	}()
@@ -78,7 +77,7 @@ func (c *consulResolver) watch() error {
 	return nil
 }
 
-func (c *consulResolver) ResolveNow(options resolver.ResolveNowOptions) {
+func (c *consulResolver) ResolveNow(options gresolver.ResolveNowOptions) {
 
 }
 

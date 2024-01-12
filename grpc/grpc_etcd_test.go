@@ -30,6 +30,8 @@ func (s *EtcdTestSuite) SetupSuite() {
 }
 
 func (s *EtcdTestSuite) TestClient() {
+	s.T()
+	fmt.Println("--------------------------------------")
 	bd, err := resolver.NewBuilder(s.client)
 	require.NoError(s.T(), err)
 	// URL 的规范 scheme:///xxxxx
@@ -85,6 +87,7 @@ func (s *EtcdTestSuite) TestServer() {
 		Metadata: map[string]any{
 			"weight": 100,
 			"cpu":    90,
+			"vip":    "true",
 		},
 	}, etcdv3.WithLease(leaseResp.ID))
 	require.NoError(s.T(), err)
@@ -101,8 +104,9 @@ func (s *EtcdTestSuite) TestServer() {
 	}()
 
 	go func() {
-		ticker := time.NewTicker(time.Second)
+		ticker := time.NewTicker(time.Second * 5)
 		// 万一，我的注册信息有变动，怎么办？
+		n := 0
 		for now := range ticker.C {
 			ctx1, cancel1 := context.WithTimeout(context.Background(), time.Second)
 			// AddEndpoint 是一个覆盖的语义。也就是说，如果你这边已经有这个 key 了，就覆盖
@@ -112,14 +116,15 @@ func (s *EtcdTestSuite) TestServer() {
 				// 你们的分组信息，权重信息，机房信息
 				// 以及动态判定负载的时候，可以把你的负载信息也写到这里
 				Metadata: map[string]any{
-					"weight": 200,
+					"weight": 200 + n,
 					"time":   now.String(),
+					"vip":    "true",
 				},
 			}, etcdv3.WithLease(leaseResp.ID))
 			if err != nil {
 				s.T().Log(err)
 			}
-
+			n += 1
 			// 我最开始，以为 Update 是需要自己手工删了，然后再加上去
 			//em.Update(ctx1, []*endpoints.UpdateWithOpts{
 			//	{

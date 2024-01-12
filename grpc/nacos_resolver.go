@@ -3,17 +3,18 @@ package grpc
 import (
 	"errors"
 	"fmt"
+
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
-	"google.golang.org/grpc/resolver"
+	gresolver "google.golang.org/grpc/resolver"
 )
 
 type nacosResolverBuilder struct {
 	client naming_client.INamingClient
 }
 
-func (n *nacosResolverBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
+func (n *nacosResolverBuilder) Build(target gresolver.Target, cc gresolver.ClientConn, opts gresolver.BuildOptions) (gresolver.Resolver, error) {
 	res := &nacosResolver{client: n.client, target: target, cc: cc}
 	// 订阅服务器变更
 
@@ -26,11 +27,11 @@ func (n *nacosResolverBuilder) Scheme() string {
 
 type nacosResolver struct {
 	client naming_client.INamingClient
-	target resolver.Target
-	cc     resolver.ClientConn
+	target gresolver.Target
+	cc     gresolver.ClientConn
 }
 
-func (r *nacosResolver) ResolveNow(options resolver.ResolveNowOptions) {
+func (r *nacosResolver) ResolveNow(options gresolver.ResolveNowOptions) {
 	// 注意，里面还有一个 SelectAllInstances，你要注意却别
 	svcs, err := r.client.SelectInstances(vo.SelectInstancesParam{
 		ServiceName: r.target.Endpoint(),
@@ -64,13 +65,13 @@ func (r *nacosResolver) subscribe() error {
 }
 
 func (r *nacosResolver) reportAddrs(svcs []model.Instance) error {
-	addrs := make([]resolver.Address, 0, len(svcs))
+	addrs := make([]gresolver.Address, 0, len(svcs))
 	for _, svc := range svcs {
-		addrs = append(addrs, resolver.Address{
+		addrs = append(addrs, gresolver.Address{
 			Addr: fmt.Sprintf("%s:%d", svc.Ip, svc.Port),
 		})
 	}
-	return r.cc.UpdateState(resolver.State{
+	return r.cc.UpdateState(gresolver.State{
 		Addresses: addrs,
 	})
 }

@@ -32,9 +32,6 @@ func (b *WeightedPicker) Pick(info balancer.PickInfo) (balancer.PickResult, erro
 	// 这里实时计算 totalWeight 是为了方便你作业动态调整权重
 	var totalWeight int
 	var res *weightConn
-	//获取前端的ctx 中的内容
-	//ctx := info.Ctx
-	//fmt.Println(ctx.Value("vip").(string))
 
 	b.mutex.Lock()
 	for _, node := range b.conns {

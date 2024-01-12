@@ -18,9 +18,9 @@ import (
 var needToRegister = errors.New("需要重新注册服务端")
 
 type UserGrpcServer interface {
-	Start(userService UserServiceServer, medaData map[string]any) error
+	Start(medaData map[string]any) error
 	//RegisterServer grpc 服务注册
-	RegisterServer(userService UserServiceServer)
+	RegisterServer()
 	//RegisterToRA 向注册中心注册并保持续约
 	RegisterToRA(ctx context.Context, medaData map[string]any)
 	//UpdateToRA 更新 节点信息
@@ -38,13 +38,12 @@ type RegisterMidd interface {
 	ConnectToRA(ctx context.Context) error
 
 	DeleteEndpoint(serviceKey string) error
+	Close()
 }
 
 type EtcdRegisterMidd struct {
 	client    *clientv3.Client
 	endPoints string
-	//用于检测的key  唯不唯一都可以
-	Name string
 	//续约间隔
 	ttl int64
 	//检测间隔
@@ -57,9 +56,16 @@ type EtcdRegisterMidd struct {
 	medaData     map[string]any
 }
 
+func (e *EtcdRegisterMidd) Close() {
+	if e.client != nil {
+		err := e.client.Close()
+		fmt.Println("registerMid close error:", err)
+	}
+}
+
 func NewEtcdRegisterMidd(
 	endpoints string,
-	name string, ttl int64,
+	ttl int64,
 	checkInterval time.Duration, checkTimeOut time.Duration,
 	lock sync.Mutex) *EtcdRegisterMidd {
 	//endpoints 是逗号分隔的字符串  120.132.118.90:2379,120.132.118.90:2380,120.132.118.90:2379
@@ -71,8 +77,14 @@ func NewEtcdRegisterMidd(
 	if err != nil {
 		panic(err)
 	}
-	return &EtcdRegisterMidd{client: client, Name: name, ttl: ttl, checkInterval: checkInterval, checkTimeOut: checkTimeOut, lock: lock, endPoints: endpoints}
+	etcdRegisterMidd := &EtcdRegisterMidd{client: client, ttl: ttl, checkInterval: checkInterval, checkTimeOut: checkTimeOut, lock: lock, endPoints: endpoints}
 
+	if err = etcdRegisterMidd.healthyCheck(context.Background()); err != nil {
+		fmt.Println("etcd 连接异常")
+		panic(err)
+	}
+
+	return etcdRegisterMidd
 }
 
 func (e *EtcdRegisterMidd) DeleteEndpoint(serviceKey string) error {
@@ -82,12 +94,8 @@ func (e *EtcdRegisterMidd) DeleteEndpoint(serviceKey string) error {
 	return (*e.em).DeleteEndpoint(ctx, serviceKey)
 }
 
-func (e *EtcdRegisterMidd) healthyCheck() error {
-	//defer func() {
-	//	err := recover()
-	//	fmt.Println(err)
-	//}()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+func (e *EtcdRegisterMidd) healthyCheck(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	_, err := e.client.Status(ctx, e.endPoints)
 	//fmt.Println("写操作:", err)
@@ -97,8 +105,7 @@ func (e *EtcdRegisterMidd) healthyCheck() error {
 func (e *EtcdRegisterMidd) RegisterToRA(ctxCtl context.Context, serviceKey, address string, medaData map[string]any) {
 	//serviceKey  service/user
 	//address 192.168.8.8:9090
-	fmt.Println("RegisterToRA")
-	fmt.Println("第一个:", serviceKey)
+	var timer *time.Timer
 	em, err := endpoints.NewManager(e.client,
 		serviceKey)
 	if err != nil {
@@ -106,7 +113,6 @@ func (e *EtcdRegisterMidd) RegisterToRA(ctxCtl context.Context, serviceKey, addr
 	}
 	e.em = &em
 	for {
-		fmt.Println("进来第一次")
 		//需要在这里做一个锁  update 跟自动注册 加个锁  但是还有会有先后顺序的问题
 		e.lock.Lock()
 		if e.medaData == nil {
@@ -114,42 +120,45 @@ func (e *EtcdRegisterMidd) RegisterToRA(ctxCtl context.Context, serviceKey, addr
 		}
 		medaData = e.medaData
 		e.lock.Unlock()
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-		defer cancel()
+		ctx, cancel := context.WithTimeout(ctxCtl, time.Second*2)
 		// 例子以 service/user 为前缀
 		//addr := fmt.Sprintf("%s:%d", m.Ip, m.Port)
 		//key := m.serverKey + addr
 		key := serviceKey + "/" + address
 		leaseResp, err := e.client.Grant(ctx, e.ttl)
-		//在这里还要再次判断 是不是正常设备
-		err = e.healthyCheck()
+		cancel()
+		////在这里还要再次判断 是不是正常设备
+		//err = e.healthyCheck(ctxCtl)
 		if err != nil {
 			fmt.Println("注册后端服务之前,etcd 服务异常:", err)
 			select {
 			case <-ctxCtl.Done():
-				fmt.Println("？？？？？？")
 				return
 			default:
-				time.Sleep(time.Second * 3)
+				if timer == nil {
+					timer = time.NewTimer(e.checkInterval)
+				} else {
+					timer.Reset(e.checkInterval)
+				}
+				select {
+				case <-timer.C:
+					fmt.Println("时间等待:", time.Now().String())
+				case <-ctxCtl.Done():
+					timer.Stop()
+					return
+				}
 			}
-			fmt.Println("????继续")
 			continue
 		}
 		// metadata 一般用在客户端
-		fmt.Println("第二个key:", key)
-		err = em.AddEndpoint(ctx, key,
+		ctxAdd, cancelAdd := context.WithTimeout(ctxCtl, time.Second*2)
+		err = em.AddEndpoint(ctxAdd, key,
 			endpoints.Endpoint{Addr: address, Metadata: medaData}, clientv3.WithLease(leaseResp.ID))
+		cancelAdd()
 		if err != nil {
 			//不退出 继续尝试,只打印日志
 			//panic(err)
 			fmt.Println("注册节点失败:", err)
-			select {
-			case <-ctxCtl.Done():
-				return
-			default:
-				time.Sleep(time.Second * 5)
-			}
-
 			continue
 		}
 		e.leaseId = leaseResp.ID
@@ -165,7 +174,7 @@ func (e *EtcdRegisterMidd) RegisterToRA(ctxCtl context.Context, serviceKey, addr
 			return
 		case <-registerChan:
 			//需要帮服务端重新注册
-			fmt.Println("重新开启异步任务")
+			fmt.Println("需要重新开启异步任务")
 			cancelFunc()
 			continue
 		}
@@ -175,13 +184,19 @@ func (e *EtcdRegisterMidd) RegisterToRA(ctxCtl context.Context, serviceKey, addr
 
 func (e *EtcdRegisterMidd) SyncToDo() (context.CancelFunc, chan struct{}) {
 	keepCtx, keepCancel := context.WithCancel(context.Background())
+	var registerChan chan struct{}
+	registerChan = make(chan struct{}, 1)
 	//续约
+	var onceClose sync.Once
 	go func() {
 		ch, err := e.client.KeepAlive(keepCtx, e.leaseId)
 		if err != nil {
 			//应该尝试继续操作
-			println("开启续约失败:", err)
-
+			//println("开启续约失败:", err)
+			onceClose.Do(func() {
+				close(registerChan)
+			})
+			return
 		}
 		for resp := range ch {
 			//续约的日志
@@ -189,15 +204,17 @@ func (e *EtcdRegisterMidd) SyncToDo() (context.CancelFunc, chan struct{}) {
 		}
 		fmt.Println("续约协程退出")
 	}()
-	var registerChan chan struct{}
-	registerChan = make(chan struct{}, 1)
+
 	//开始做健康检查
 	go func() {
 		err := e.ConnectToRA(keepCtx)
 		if errors.Is(err, needToRegister) {
-			close(registerChan)
+			fmt.Println("健康检查协程 被强制退出(受影响与续约协程) 或 健康检查不通过")
+			onceClose.Do(func() {
+				close(registerChan)
+			})
 		} else {
-			fmt.Println("健康检查协程退出....")
+			fmt.Println("健康检查协程正常退出")
 			return
 		}
 	}()
@@ -233,9 +250,9 @@ func (e *EtcdRegisterMidd) ConnectToRA(ctx context.Context) error {
 	//这里可以设置成 多次成功 增加检测间隔
 	//失败 之后就马上通知服务端去注册
 	//var times int
+	var timer *time.Timer
 	for {
-
-		err := e.healthyCheck()
+		err := e.healthyCheck(ctx)
 		if err != nil {
 			////如果是超时错误就给3次机会 可配置
 			//if !errors.Is(err, context.DeadlineExceeded) {
@@ -252,7 +269,7 @@ func (e *EtcdRegisterMidd) ConnectToRA(ctx context.Context) error {
 			////累计次数
 			//times += 1
 
-			//建议直接退出 ,不然续约那边断掉了 就起不来了
+			//TODO  建议直接退出 ,不然续约那边断掉了 就起不来了
 			return needToRegister
 		}
 		select {
@@ -260,7 +277,18 @@ func (e *EtcdRegisterMidd) ConnectToRA(ctx context.Context) error {
 			//服务端通知不需要检测了
 			return ctx.Err()
 		default:
-			time.Sleep(e.checkInterval)
+			if timer == nil {
+				timer = time.NewTimer(e.checkInterval)
+			} else {
+				timer.Reset(e.checkInterval)
+			}
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				timer.Stop()
+				return ctx.Err()
+			}
+
 		}
 
 	}
@@ -280,9 +308,9 @@ func NewMyUserServer(ip string, port int, regisMid RegisterMidd, serverKey strin
 	return &MyUserServer{Ip: ip, Port: port, regisMid: regisMid, serverKey: serverKey}
 }
 
-func (m *MyUserServer) RegisterServer(userService UserServiceServer) {
+func (m *MyUserServer) RegisterServer() {
 	m.server = grpc.NewServer()
-	RegisterUserServiceServer(m.server, &Server{})
+	RegisterUserServiceServer(m.server, &Server{Name: "内网测试"})
 }
 
 func (m *MyUserServer) RegisterToRA(ctx context.Context, medaData map[string]any) {
@@ -294,18 +322,21 @@ func (m *MyUserServer) UpdateToRA(metaDate map[string]any) error {
 
 }
 
-func (m *MyUserServer) Start(userService UserServiceServer, metaData map[string]any) error {
+func (m *MyUserServer) Start(metaData map[string]any) error {
 	address := fmt.Sprintf("%s:%d", m.Ip, m.Port)
 	fmt.Println(address)
-	listen, err := net.Listen("tcp", ":8091")
+	listen, err := net.Listen("tcp", address)
 	if err != nil {
 		panic(err)
 	}
 
-	m.RegisterServer(userService)
+	m.RegisterServer()
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancelFun = cancel
-	m.RegisterToRA(ctx, metaData)
+	go func() {
+		m.RegisterToRA(ctx, metaData)
+		fmt.Println("全部异步任务退出")
+	}()
 	return m.server.Serve(listen)
 }
 
@@ -314,6 +345,8 @@ func (m *MyUserServer) Stop() {
 	m.cancelFun()
 
 	m.regisMid.DeleteEndpoint(fmt.Sprintf("%s/%s", m.serverKey, fmt.Sprintf("%s:%d", m.Ip, m.Port)))
+
+	m.regisMid.Close()
 	//grpc 服务优雅终止,给服务增加一些拦截以及一些 在处理服务的等待
 	m.server.GracefulStop()
 
@@ -321,20 +354,25 @@ func (m *MyUserServer) Stop() {
 
 func Test_Server(t *testing.T) {
 
-	regMid := NewEtcdRegisterMidd("120.132.118.90:2379", "text_server", 5, time.Second*2, time.Second*2, sync.Mutex{})
+	regMid := NewEtcdRegisterMidd("120.132.118.90:2379", 5, time.Second*2, time.Second*2, sync.Mutex{})
 	server := NewMyUserServer("127.0.0.1", 8091, regMid, "service/user")
 
-	//go func() {
-	//	time.Sleep(time.Second * 20)
-	//	server.Stop()
-	//}()
-	fmt.Println("服务启动、、、、、")
-	fmt.Println(server.Start(&Server{Name: "内网"}, map[string]any{
-		"weight": 200,
-	}))
+	defer func() {
+		//time.Sleep(time.Second * 20)
+		server.Stop()
+	}()
+	fmt.Println("服务启动")
+	fmt.Println("服务异常结束:", server.Start(
+		map[string]any{
+			"weight": 200,
+		}))
 }
 
 //第一个: service/user
 //第一个: service/user
 //第二个key: service/user/127.0.0.1:8091
 //第二个key: service/user/127.0.0.1:8981
+//service/user/127.0.0.1:8091
+//service/user/127.0.0.1:8091
+//{"Op":0,"Addr":"127.0.0.1:8091","Metadata":{"weight":200}}
+//{"Op":0,"Addr":"127.0.0.1:8091","Metadata":{"weight":200}}

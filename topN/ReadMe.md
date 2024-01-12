@@ -120,11 +120,11 @@ canal.properties  instance.properties
 #################################################
 #########     common argument    #############
 #################################################
-# tcp bind ip
+# tcp bind port
 # 用户go 等客户端连接的ip
-canal.ip = 156.236.71.5
-# register ip to zookeeper
-canal.register.ip = 156.236.71.5
+canal.port = 156.236.71.5
+# register port to zookeeper
+canal.register.port = 156.236.71.5
 # 用户go 等客户端连接的端口
 canal.port = 11111
 canal.metrics.pull.port = 11112
