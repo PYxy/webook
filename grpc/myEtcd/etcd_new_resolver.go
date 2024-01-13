@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -23,10 +24,14 @@ type builder struct {
 	currentFile   string
 	checkInterval time.Duration
 	em            *endpoints.Manager
+	needToDo      atomic.Bool
+	signChan      chan struct{}
 }
 
 func (b *builder) Build(target gresolver.Target, cc gresolver.ClientConn, opts gresolver.BuildOptions) (gresolver.Resolver, error) {
 	fmt.Println("resolver Build")
+	var signChan chan struct{}
+	signChan = make(chan struct{}, 1)
 	// Refer to https://github.com/grpc/grpc-go/blob/16d3df80f029f57cff5458f1d6da6aedbc23545d/clientconn.go#L1587-L1611
 	endpoint := target.URL.Path
 	if endpoint == "" {
@@ -34,9 +39,10 @@ func (b *builder) Build(target gresolver.Target, cc gresolver.ClientConn, opts g
 	}
 	endpoint = strings.TrimPrefix(endpoint, "/")
 	b.r = &resolver{
-		c:      b.c,
-		target: endpoint,
-		cc:     cc,
+		c:         b.c,
+		target:    endpoint,
+		cc:        cc,
+		localfile: b.currentFile,
 	}
 	//r := &resolver{
 	//	c:      b.c,
@@ -59,19 +65,33 @@ func (b *builder) Build(target gresolver.Target, cc gresolver.ClientConn, opts g
 	defer cancel()
 	if err := b.healthyCheck(ctx); err != nil {
 		fmt.Println("客户端连接etcd 失败")
-		panic(err)
+		//panic(err)
 	}
-	fmt.Println("开搞、、、")
-	time.Sleep(time.Second * 10)
+	fmt.Println("开搞、、、为什么需要延时", endpoint)
 	em, err := endpoints.NewManager(b.r.c, b.r.target)
 	b.em = &em
 	if err != nil {
 		fmt.Println("客户端创建em 对象失败")
 		//panic(err)
 		//直接使用 默认的配置文件
-		b.r.cc.UpdateState(gresolver.State{Addresses: b.LocalAddress()})
+		if !b.needToDo.Load() {
+			fmt.Println("需要重新加载本地配置")
+			b.r.cc.UpdateState(gresolver.State{Addresses: b.LocalAddress()})
+			b.needToDo.Store(true)
+		}
+
 	}
 	go b.syncTodo()
+	go func() {
+		for {
+			_, ok := <-signChan
+			if ok {
+				b.needToDo.Store(false)
+			} else {
+				return
+			}
+		}
+	}()
 	return b.r, nil
 }
 
@@ -165,7 +185,7 @@ func (b *builder) syncTodo() {
 			fmt.Println("????2")
 			err := b.ConnectToRA(b.r.ctx)
 			if errors.Is(err, needToRegister) {
-				fmt.Println("健康检查协程 被强制退出(受影响与续约协程) 或 健康检查不通过")
+				fmt.Println("g通过")
 				onceClose.Do(func() {
 					close(registerChan)
 				})
@@ -185,7 +205,11 @@ func (b *builder) syncTodo() {
 		case <-registerChan:
 			//加载默认的配置文件
 			b.r.cancel()
-			b.r.cc.UpdateState(gresolver.State{Addresses: b.LocalAddress()})
+			if !b.needToDo.Load() {
+				fmt.Println("需要重新加载本地配置")
+				b.r.cc.UpdateState(gresolver.State{Addresses: b.LocalAddress()})
+				b.needToDo.Store(true)
+			}
 			fmt.Println("重启服务")
 
 		}
@@ -209,13 +233,15 @@ func EtcdNewBuilder(client *clientv3.Client, endPoints string, checkInterval tim
 }
 
 type resolver struct {
-	c      *clientv3.Client
-	target string
-	cc     gresolver.ClientConn
-	wch    endpoints.WatchChannel
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	c         *clientv3.Client
+	target    string
+	cc        gresolver.ClientConn
+	wch       endpoints.WatchChannel
+	ctx       context.Context
+	cancel    context.CancelFunc
+	wg        sync.WaitGroup
+	localfile string
+	signChan  chan struct{}
 }
 
 func (r *resolver) watch() {
@@ -260,7 +286,14 @@ func (r *resolver) watch() {
 				},
 			})
 			fmt.Println("更新可用节点信息:", addrs)
-			r.cc.UpdateState(gresolver.State{Addresses: addrs})
+			if len(addrs) == 0 {
+				//还要判断一下 是不是之前已经更新过 跟上面的判断一样
+				//读取本地的配置文件
+			} else {
+				//更新到本地文件,然后
+				r.cc.UpdateState(gresolver.State{Addresses: addrs})
+			}
+
 		}
 	}
 }
@@ -281,11 +314,12 @@ func convertToGRPCAddress(ups map[string]*endpoints.Update) []gresolver.Address 
 // It's just a hint, resolver can ignore this if it's not necessary.
 func (r *resolver) ResolveNow(gresolver.ResolveNowOptions) {
 	fmt.Println("resolver ResolveNow")
-
 }
 
 func (r *resolver) Close() {
 	fmt.Println("调用了close方法。。。")
+	//需要关闭使用的chan
+	close(r.signChan)
 	r.cancel()
 	r.wg.Wait()
 }

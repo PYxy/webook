@@ -14,9 +14,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	_ "gitee.com/geekbang/basic-go/webook/pkg/grpcx/balancer/pickOther" //匿名引入 用于自定义负载均衡策略
-
 	"gitee.com/geekbang/basic-go/webook/grpc/myEtcd"
+	_ "gitee.com/geekbang/basic-go/webook/pkg/grpcx/balancer/pickOther" //匿名引入 用于自定义负载均衡策略
 )
 
 type TestSuite struct {
@@ -36,11 +35,15 @@ func (s *TestSuite) TestClient2() {
 	s.T()
 	fmt.Println("--------------------------------------")
 	bd, err := myEtcd.EtcdNewBuilder(s.client, "120.132.118.90:2379", time.Second*5, "/etc/yisu")
+	//bd, err := resolver.NewBuilder(s.client)
 	require.NoError(s.T(), err)
+
 	// URL 的规范 scheme:///xxxxx
 	cc, err := grpc.Dial("etcd:///service/user",
 		grpc.WithResolvers(bd),
-		grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"vip_pick":{}}]}`),
+		//grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"vip_pick":{}}]}`),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"my_round_robin":{}}]}`),
+
 		//		grpc.WithDefaultServiceConfig(`{
 		//"loadBalancingConfig": [{"round_robin":{}}]
 		//}`),
@@ -60,7 +63,7 @@ func (s *TestSuite) TestClient2() {
 
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	client := NewUserServiceClient(cc)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 20; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 		defer cancel()
 		//ctx = context.WithValue(ctx, "balancer-key", 123)
@@ -97,7 +100,7 @@ func (s *TestSuite) ServiceStart(port, flag string) {
 	key := "service/user/" + addr
 	//... 在这一步之前完成所有的启动的准备工作，包括缓存预加载之类的事情
 	var kaCancel context.CancelFunc
-	if port == "8982" {
+	if port != "8984" {
 		// 这个 ctx 是控制创建租约的超时
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		// ttl 是租期
@@ -130,33 +133,32 @@ func (s *TestSuite) ServiceStart(port, flag string) {
 				s.T().Log(kaResp.String(), time.Now().String())
 			}
 		}()
+		go func() {
+			ticker := time.NewTicker(time.Second * 5)
+			// 万一，我的注册信息有变动，怎么办？
+			n := 0
+			for now := range ticker.C {
+				ctx1, cancel1 := context.WithTimeout(context.Background(), time.Second)
+				// AddEndpoint 是一个覆盖的语义。也就是说，如果你这边已经有这个 key 了，就覆盖
+				// upsert，set
+				err = em.AddEndpoint(ctx1, key, endpoints.Endpoint{
+					Addr: addr,
+					// 你们的分组信息，权重信息，机房信息
+					// 以及动态判定负载的时候，可以把你的负载信息也写到这里
+					Metadata: map[string]any{
+						"weight": 200 + n,
+						"time":   now.String(),
+						"vip":    "true",
+					},
+				}, etcdv3.WithLease(leaseResp.ID))
+				if err != nil {
+					s.T().Log(err)
+				}
+				n += 1
+				cancel1()
+			}
+		}()
 	}
-
-	//go func() {
-	//	ticker := time.NewTicker(time.Second * 5)
-	//	// 万一，我的注册信息有变动，怎么办？
-	//	n := 0
-	//	for now := range ticker.C {
-	//		ctx1, cancel1 := context.WithTimeout(context.Background(), time.Second)
-	//		// AddEndpoint 是一个覆盖的语义。也就是说，如果你这边已经有这个 key 了，就覆盖
-	//		// upsert，set
-	//		err = em.AddEndpoint(ctx1, key, endpoints.Endpoint{
-	//			Addr: addr,
-	//			// 你们的分组信息，权重信息，机房信息
-	//			// 以及动态判定负载的时候，可以把你的负载信息也写到这里
-	//			Metadata: map[string]any{
-	//				"weight": 200 + n,
-	//				"time":   now.String(),
-	//				"vip":    "true",
-	//			},
-	//		}, etcdv3.WithLease(leaseResp.ID))
-	//		if err != nil {
-	//			s.T().Log(err)
-	//		}
-	//		n += 1
-	//		cancel1()
-	//	}
-	//}()
 
 	server := grpc.NewServer()
 	RegisterUserServiceServer(server, &Server2{Port: port})

@@ -51,7 +51,7 @@ func (p *rrPicker) Pick(balancer.PickInfo) (balancer.PickResult, error) {
 	fmt.Println("跑起来")
 	subConnsLen := uint32(len(p.subConns))
 	nextIndex := atomic.AddUint32(&p.next, 1)
-
+	fmt.Println("index:", nextIndex)
 	sc := p.subConns[nextIndex%subConnsLen]
 	return balancer.PickResult{SubConn: sc, Done: func(info balancer.DoneInfo) {
 		fmt.Println(info.Err)
