@@ -2,6 +2,7 @@ package wrr
 
 import (
 	"fmt"
+	"math"
 	"sync"
 
 	"google.golang.org/grpc/balancer"
@@ -50,6 +51,27 @@ func (b *WeightedPicker) Pick(info balancer.PickInfo) (balancer.PickResult, erro
 			// 在这里执行 failover 有关的事情
 			// 例如说把 res 的 currentWeight 进一步调低到一个非常低的值
 			// 也可以直接把 res 从 b.conns 删除
+			//不管是提高还是降低，都要设置一个阈值。比如说不允许降低到负数，不允许提高到某个极大的值。
+			//并且思考，如果没有这个限制，可能发生什么。
+
+			//最大值 +1 变成负数的最小值 开始 一个优先级极高的节点就会变成优先级极低的值,极大可能永远都不会选中他
+			//+inf  0 +inf 应该都要关注一下
+			b.mutex.Lock()
+			if info.Err == nil && res.currentWeight >= math.MaxInt {
+				return
+			}
+			//如果是异常响应，也就是返回的 error 不为 nil，就降低权重。
+			if info.Err != nil && res.currentWeight == 0 {
+				return
+			}
+
+			if info.Err != nil {
+				res.currentWeight--
+			} else {
+				res.currentWeight++
+			}
+
+			b.mutex.Unlock()
 		},
 	}, nil
 }
