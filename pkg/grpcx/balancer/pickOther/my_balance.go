@@ -26,6 +26,7 @@ func (*rrPickerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 	if len(info.ReadySCs) == 0 {
 		return base.NewErrPicker(balancer.ErrNoSubConnAvailable)
 	}
+	fmt.Println("builder  可用后端列表构建")
 	scs := make([]balancer.SubConn, 0, len(info.ReadySCs))
 	for sc := range info.ReadySCs {
 		scs = append(scs, sc)
@@ -54,7 +55,7 @@ func (p *rrPicker) Pick(balancer.PickInfo) (balancer.PickResult, error) {
 	fmt.Println("index:", nextIndex)
 	sc := p.subConns[nextIndex%subConnsLen]
 	return balancer.PickResult{SubConn: sc, Done: func(info balancer.DoneInfo) {
-		fmt.Println(info.Err)
+		fmt.Println("grpc请求后 是否有错误", info.Err)
 		fmt.Println(info.Trailer)
 	}}, nil
 }
