@@ -84,6 +84,7 @@ func (b *WeightedPicker) Pickv2(info balancer.PickInfo) (balancer.PickResult, er
 }
 
 func (b *WeightedPicker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
+	fmt.Println("没请求一次都会进来一下这里 Pick")
 	if len(b.conns) == 0 {
 		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}

@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	lres "gitee.com/geekbang/basic-go/webook/grpc/local_resolver"
 	"gitee.com/geekbang/basic-go/webook/grpc/myEtcd"
 	_ "gitee.com/geekbang/basic-go/webook/pkg/grpcx/balancer/pickOther" //匿名引入 用于自定义负载均衡策略
 	_ "gitee.com/geekbang/basic-go/webook/pkg/grpcx/balancer/wrr"       //匿名引入 用于自定义负载均衡策略
@@ -130,6 +131,65 @@ func (s *TestSuite) TestClientWRR() {
 		require.NoError(s.T(), err)
 		s.T().Log(resp.User)
 		time.Sleep(time.Second * 6)
+	}
+	//这是为了看下 健康检查协程会不会退出
+	time.Sleep(time.Second * 5)
+
+}
+
+func (s *TestSuite) TestClientLocalResolver() {
+	cfg := `
+{
+  "loadBalancingConfig": [{"round_robin":{}}],
+  "methodConfig": [{
+    "name": [{"service": "UserService"}],
+    "retryPolicy": {
+      "maxAttempts": 4,
+      "initialBackoff": "0.01s",
+      "maxBackoff": "0.1s",
+      "backoffMultiplier": 2.0,
+      "retryableStatusCodes": [ "UNAVAILABLE" ]
+    }
+  }]
+}
+`
+	s.T()
+	fmt.Println("--------------------------------------")
+	bd := lres.NewLocalResolver()
+
+	// URL 的规范 scheme:///xxxxx
+	cc, err := grpc.Dial("local:///service/user",
+		grpc.WithResolvers(bd),
+		//grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"weighted_round_robin":{}}]}`),
+		grpc.WithDefaultServiceConfig(cfg),
+		grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+			fmt.Println("中间件")
+			err := invoker(ctx, method, req, reply, cc)
+			if err != nil {
+				fmt.Println(req)
+				fmt.Println(reply)
+				fmt.Println(method)
+				fmt.Println(cc.GetState().String())
+				fmt.Println("请求异常。。。:", err)
+			}
+			return err
+		}),
+
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		panic(err)
+	}
+	client := NewUserServiceClient(cc)
+	for i := 0; i < 5; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+		defer cancel()
+		//ctx = context.WithValue(ctx, "balancer-key", 123)
+		resp, err := client.GetById(ctx, &GetByIdRequest{
+			Id: 123,
+		})
+		require.NoError(s.T(), err)
+		s.T().Log(resp.User)
+		time.Sleep(time.Second * 2)
 	}
 	//这是为了看下 健康检查协程会不会退出
 	time.Sleep(time.Second * 5)
