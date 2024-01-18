@@ -1,0 +1,13 @@
+grpc:
+    service/user:
+        nodes:
+            - address: 127.0.0.1:8983
+              labels:
+                time: 2024-01-18 13:48:13.5833189 +0800 +08 m=+15.127471401
+                vip: "true"
+                weight: 202
+            - address: 127.0.0.1:8982
+              labels:
+                time: 2024-01-18 13:48:13.5833189 +0800 +08 m=+15.127471401
+                vip: "true"
+                weight: 202

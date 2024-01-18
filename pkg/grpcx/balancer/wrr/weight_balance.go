@@ -57,11 +57,14 @@ func (b *WeightedPicker) Pick(info balancer.PickInfo) (balancer.PickResult, erro
 			//最大值 +1 变成负数的最小值 开始 一个优先级极高的节点就会变成优先级极低的值,极大可能永远都不会选中他
 			//+inf  0 +inf 应该都要关注一下
 			b.mutex.Lock()
+			defer b.mutex.Unlock()
 			if info.Err == nil && res.currentWeight >= math.MaxInt {
+
 				return
 			}
 			//如果是异常响应，也就是返回的 error 不为 nil，就降低权重。
 			if info.Err != nil && res.currentWeight == 0 {
+
 				return
 			}
 
@@ -71,7 +74,6 @@ func (b *WeightedPicker) Pick(info balancer.PickInfo) (balancer.PickResult, erro
 				res.currentWeight++
 			}
 
-			b.mutex.Unlock()
 		},
 	}, nil
 }

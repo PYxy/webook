@@ -34,7 +34,7 @@ func (s *TestSuite) SetupSuite() {
 func (s *TestSuite) TestClient2() {
 	s.T()
 	fmt.Println("--------------------------------------")
-	bd, err := myEtcd.EtcdNewBuilder(s.client, "120.132.118.90:2379", time.Second*5, "/etc/yisu")
+	bd, err := myEtcd.EtcdNewBuilder(s.client, "120.132.118.90:2379", time.Second*5, "./grpc.yaml")
 	//bd, err := resolver.NewBuilder(s.client)
 	require.NoError(s.T(), err)
 

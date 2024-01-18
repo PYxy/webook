@@ -38,6 +38,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.17.0
 	github.com/stretchr/testify v1.8.4
+	github.com/wechatpay-apiv3/wechatpay-go v0.2.18
 	github.com/withlin/canal-go v1.1.1
 	github.com/zeromicro/go-zero v1.6.1
 	go.etcd.io/etcd/client/v3 v3.5.11
@@ -55,6 +56,7 @@ require (
 	golang.org/x/sync v0.5.0
 	google.golang.org/grpc v1.60.0
 	google.golang.org/protobuf v1.31.1-0.20231027082548-f4a6c1f6e5c1
+	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.5.2
 	gorm.io/gorm v1.25.5
 	gorm.io/plugin/opentelemetry v0.1.4
@@ -337,7 +339,6 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/tools v0.4.3 // indirect
 	k8s.io/api v0.28.4 // indirect
 	k8s.io/apimachinery v0.28.4 // indirect

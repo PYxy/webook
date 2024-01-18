@@ -1,0 +1,15 @@
+grpc:
+  service/user:
+    nodes:
+      - address: 127.0.0.1:8982
+        labels:
+          weight: 100,
+          cpu: 90,
+          vip: true,
+          ip: "127.0.0.1:8982",
+      - address: 127.0.0.1:8983
+        labels:
+          weight: 80,
+          cpu: 70,
+          vip: true,
+          ip: "127.0.0.1:8983",

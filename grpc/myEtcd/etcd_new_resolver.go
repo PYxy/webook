@@ -38,6 +38,7 @@ func (b *builder) Build(target gresolver.Target, cc gresolver.ClientConn, opts g
 		endpoint = target.URL.Opaque
 	}
 	endpoint = strings.TrimPrefix(endpoint, "/")
+	fmt.Println("endpoint:", endpoint)
 	b.r = &resolver{
 		c:         b.c,
 		target:    endpoint,
@@ -76,7 +77,7 @@ func (b *builder) Build(target gresolver.Target, cc gresolver.ClientConn, opts g
 		//直接使用 默认的配置文件
 		if !b.needToDo.Load() {
 			fmt.Println("需要重新加载本地配置")
-			b.r.cc.UpdateState(gresolver.State{Addresses: b.LocalAddress()})
+			b.r.cc.UpdateState(gresolver.State{Addresses: b.LocalAddress("./grpc.yaml")})
 			b.needToDo.Store(true)
 		}
 
@@ -95,27 +96,46 @@ func (b *builder) Build(target gresolver.Target, cc gresolver.ClientConn, opts g
 	return b.r, nil
 }
 
-func (b *builder) LocalAddress() []gresolver.Address {
-	return []gresolver.Address{
-		gresolver.Address{
-			Addr: "127.0.0.1:8983",
-			Metadata: map[string]any{
-				"weight": 100,
-				"cpu":    90,
-				"vip":    "true",
-				"ip":     "127.0.0.1:8983",
-			},
-		},
-		gresolver.Address{
-			Addr: "127.0.0.1:8982",
-			Metadata: map[string]any{
-				"weight": 100,
-				"cpu":    90,
-				"vip":    "true",
-				"ip":     "127.0.0.1:8982",
-			},
-		},
+func (b *builder) LocalAddress(serviceName string) []gresolver.Address {
+
+	ls := new(LocalServer)
+	if err := ReadYaml(ls, b.currentFile); err != nil {
+		return []gresolver.Address{}
 	}
+	var resolverAddr []gresolver.Address
+	serviceNode, ok := ls.GRPC[serviceName]
+	if !ok {
+		return []gresolver.Address{}
+	}
+	resolverAddr = make([]gresolver.Address, 0, len(serviceNode.Nodes))
+	for _, node := range serviceNode.Nodes {
+		resolverAddr = append(resolverAddr, gresolver.Address{
+			Addr:       node.Address,
+			ServerName: serviceName,
+			Metadata:   node.Labels,
+		})
+	}
+	//return []gresolver.Address{
+	//	gresolver.Address{
+	//		Addr: "127.0.0.1:8983",
+	//		Metadata: map[string]any{
+	//			"weight": 100,
+	//			"cpu":    90,
+	//			"vip":    "true",
+	//			"ip":     "127.0.0.1:8983",
+	//		},
+	//	},
+	//	gresolver.Address{
+	//		Addr: "127.0.0.1:8982",
+	//		Metadata: map[string]any{
+	//			"weight": 100,
+	//			"cpu":    90,
+	//			"vip":    "true",
+	//			"ip":     "127.0.0.1:8982",
+	//		},
+	//	},
+	//}
+	return resolverAddr
 }
 func (b *builder) healthyCheck(ctx context.Context) error {
 	//endpoints 是逗号分隔的字符串  120.132.118.90:2379,120.132.118.90:2380,120.132.118.90:2379
@@ -206,8 +226,8 @@ func (b *builder) syncTodo() {
 			//加载默认的配置文件
 			b.r.cancel()
 			if !b.needToDo.Load() {
-				fmt.Println("需要重新加载本地配置")
-				b.r.cc.UpdateState(gresolver.State{Addresses: b.LocalAddress()})
+				fmt.Println("需要重新加载本地配置2")
+				b.r.cc.UpdateState(gresolver.State{Addresses: b.LocalAddress("./grpc.yaml")})
 				b.needToDo.Store(true)
 			}
 			fmt.Println("重启服务")
@@ -276,26 +296,43 @@ func (r *resolver) watch() {
 				fmt.Println(addrs[i].Metadata)
 			}
 			//手动添加节点进去
-			addrs = append(addrs, gresolver.Address{
-				Addr: "127.0.0.1:8983",
-				Metadata: map[string]any{
-					"weight": 100,
-					"cpu":    90,
-					"vip":    "true",
-					"ip":     "127.0.0.1:8983",
-				},
-			})
+			//addrs = append(addrs, gresolver.Address{
+			//	Addr: "127.0.0.1:8983",
+			//	Metadata: map[string]any{
+			//		"weight": 100,
+			//		"cpu":    90,
+			//		"vip":    "true",
+			//		"ip":     "127.0.0.1:8983",
+			//	},
+			//})
 			fmt.Println("更新可用节点信息:", addrs)
 			if len(addrs) == 0 {
 				//还要判断一下 是不是之前已经更新过 跟上面的判断一样
 				//读取本地的配置文件
 			} else {
 				//更新到本地文件,然后
-				r.cc.UpdateState(gresolver.State{Addresses: addrs})
+				nodes := make([]NodePort, 0, len(addrs))
+				for _, addr := range addrs {
+					fmt.Println("metadata:", (addr.Metadata).((map[string]any)))
+					nodes = append(nodes, NodePort{
+						Address: addr.Addr,
+						Labels:  (addr.Metadata).((map[string]any)),
+					})
+				}
+				ls := &LocalServer{GRPC: map[string]ServicePart{
+					"service/user": {Nodes: nodes},
+				},
+				}
+				//这里还要修改一下
+				err := SaveYaml(ls, r.localfile)
+				fmt.Println("失败:", err)
 			}
 
+			r.cc.UpdateState(gresolver.State{Addresses: addrs})
 		}
+
 	}
+
 }
 
 func convertToGRPCAddress(ups map[string]*endpoints.Update) []gresolver.Address {
