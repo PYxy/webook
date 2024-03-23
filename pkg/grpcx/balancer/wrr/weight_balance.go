@@ -95,7 +95,7 @@ func (b *WeightedPicker) Pick(info balancer.PickInfo) (balancer.PickResult, erro
 	b.mutex.Lock()
 	for _, node := range b.conns {
 		if !node.isActive.Load() {
-			//熔断或者限流的 先排除
+			//熔断先排除
 			continue
 		}
 		totalWeight += node.weight
@@ -139,18 +139,19 @@ func (b *WeightedPicker) Pick(info balancer.PickInfo) (balancer.PickResult, erro
 					return
 				}
 				//看下这样写是否正确
-				fmt.Println(isError.Is(status.Error(codes.Unavailable, "不可用")))
-				fmt.Println(isError.Is(status.Error(codes.ResourceExhausted, "不可用")))
-				if isError.Is(status.Error(codes.Unavailable, "不可用")) || isError.Is(status.Error(codes.ResourceExhausted, "不可用")) {
-					//响应状态异常
+				//fmt.Println(isError.Is(status.Error(codes.Unavailable, "不可用")))
+				//fmt.Println(isError.Is(status.Error(codes.ResourceExhausted, "不可用")))
+				if isError.Is(status.Error(codes.Unavailable, "不可用")) {
+					//熔断 需要剔除 并且 设置一个比较低的阈值
 					fmt.Println("需要剔除")
+					res.currentWeight = 0
+					res.isActive.Store(false)
+				} else if isError.Is(status.Error(codes.ResourceExhausted, "不可用")) {
+					// 限流需要扣分
 					if res.currentWeight == 0 {
-						//已经是最小权重了
 						return
 					}
 					res.currentWeight--
-
-					res.isActive.Store(false)
 				}
 
 			}
@@ -160,6 +161,7 @@ func (b *WeightedPicker) Pick(info balancer.PickInfo) (balancer.PickResult, erro
 }
 
 type WeightedPickerBuilder struct {
+	once sync.Once
 }
 
 // Build 获取etcd 中的所有后端信息 并针对metaData 中的数据进行整理 用于后面的Picker逻辑判断
@@ -178,37 +180,48 @@ func (b *WeightedPickerBuilder) Build(info base.PickerBuildInfo) balancer.Picker
 			currentWeight: int(weight),
 		})
 	}
-	//这样写测试不出来
+	//将异步协程跟这个对象绑定再一起
 	exitChan := make(chan struct{})
 	runtime.SetFinalizer(b, func() {
 		close(exitChan)
 	})
 
-	go func() {
-		ticker := time.NewTicker(time.Second * 5)
-		defer ticker.Stop()
-		defer func() {
-			fmt.Println("检查协程退出....")
-		}()
-		for {
-			select {
-			case <-ticker.C:
-				fmt.Println("定时任务....")
-				//将异常的数据丢回去列表中
-				for _, conn := range conns {
-					if !conn.isActive.Load() {
-						//进行必要的检查
-						fmt.Println(conn.SubConn, "是异常的进行必要的检查")
-						time.Sleep(time.Second * 2)
-						//直接修改状态
-						conn.isActive.Store(true)
+	b.once.Do(func() {
+		go func() {
+			ticker := time.NewTicker(time.Second * 5)
+			defer ticker.Stop()
+			defer func() {
+				fmt.Println("检查协程退出....")
+			}()
+			for {
+				//这里最后不要用遍历的方式 但是是最简单的。最后就是可以分开存储
+				select {
+				case <-ticker.C:
+					fmt.Println("定时任务....")
+					//将异常的数据丢回去列表中
+					for _, conn := range conns {
+						if !conn.isActive.Load() {
+							var healthtCheckerr error
+							//进行必要的检查
+							fmt.Println(conn.SubConn, "是异常的进行必要的检查")
+							//模拟健康检查耗时 但是不知道  怎么请求后端的健康检查接口
+							//time.Sleep(time.Second * 2)
+							healthtCheckerr = HealThyCheck(conn.SubConn)
+							if healthtCheckerr == nil {
+								//直接修改状态
+								//再这里也可以进一步调整权重
+								conn.isActive.Store(true)
+							}
+							//失败就不用管了
+						}
 					}
+				case <-exitChan:
+					return
 				}
-			case <-exitChan:
-				return
 			}
-		}
-	}()
+		}()
+	})
+
 	return &WeightedPicker{
 		conns: conns,
 	}
@@ -223,4 +236,9 @@ type weightConn struct {
 	//针对 降级 熔断的时候进行限制
 	isActive *atomic.Bool
 	balancer.SubConn
+}
+
+// HealThyCheck 熔断节点的健康检查
+func HealThyCheck(sc balancer.SubConn) error {
+	return nil
 }
